@@ -1,0 +1,28 @@
+Kapykuá, software de organizacion (para Practica Profesional 2)
+
+07/09/2026
+
+Realizado:
+- Se inició la etapa de creacion de una base de datos.
+- Se creo la base de datos sublimacion.sql (yo la renombre a sublimacionv1 a manera personal)
+
+Pendiente:
+- Terminar las relaciones y la estructura de la base de datos.
+
+11/09/2026
+
+RealiZado:
+- Se comparó la estructura de la base de datos con el diagrama de clases actualizado.
+- Se encontraron algunas relaciones que no coincidían con el diagrama de clases.
+
+Pendiente:
+- Corregir las relaciones que estan mal.
+
+14/09/2026
+- Se creó una versión corregida de la base de datos.
+
+Pendiente:
+- Probar la base de datos en XAMPP/phpMyAdmin.
+- Verificar que las tablas y relaciones funcionen correctamente.
+- Comenzar la implementación de la aplicación.
+
