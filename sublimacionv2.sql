@@ -2,11 +2,11 @@
 -- Versión corregida según el diagrama de clases actualizado
 -- Motor previsto: MariaDB / MySQL (XAMPP)
 
-CREATE DATABASE IF NOT EXISTS sublimacion
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_general_ci;
+CREATE DATABASE IF NOT EXISTS sublimacionv2
+CHARACTER SET utf8mb4
+COLLATE utf8mb4_general_ci;
 
-USE sublimacion;
+USE sublimacionv2;
 
 SET FOREIGN_KEY_CHECKS = 0;
 
