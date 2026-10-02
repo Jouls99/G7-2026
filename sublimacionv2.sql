@@ -39,7 +39,7 @@ CREATE TABLE cliente (
 -- ============================================
 CREATE TABLE producto (
     idProducto INT NOT NULL AUTO_INCREMENT,
-    nombre VARCHAR(15) NOT NULL,
+    nombre VARCHAR(150) NOT NULL,
     descripcion VARCHAR(60),
     precio DECIMAL(10,2),
     stock INT,
