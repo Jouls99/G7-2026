@@ -6,7 +6,6 @@
 
 :root {
     --bordo: #87314f;
-    --bordo-oscuro: #742840;
     --rosa-fondo: #d8b4ad;
     --rosa-menu: #9f526d;
     --rojo-boton: #b52f1e;
@@ -26,10 +25,6 @@ body {
     min-height: 100vh;
     display: flex;
 }
-
-/* =========================
-   BARRA LATERAL
-   ========================= */
 
 .sidebar {
     width: 198px;
@@ -94,10 +89,6 @@ body {
     text-align: center;
 }
 
-/* =========================
-   ÁREA PRINCIPAL
-   ========================= */
-
 .principal {
     flex: 1;
     min-width: 0;
@@ -124,9 +115,24 @@ body {
     padding: 0 10px 24px;
 }
 
-/* =========================
-   PASOS
-   ========================= */
+.mensaje {
+    margin: 14px 0;
+    padding: 12px 15px;
+    border-radius: 7px;
+    font-weight: bold;
+}
+
+.mensaje.exito {
+    background: #d9f0dc;
+    border: 1px solid #8bbd91;
+    color: #245d2b;
+}
+
+.mensaje.error {
+    background: #f5d8d8;
+    border: 1px solid #cf8d8d;
+    color: #762020;
+}
 
 .pasos {
     display: flex;
@@ -173,19 +179,21 @@ body {
 
 .flecha {
     margin-left: auto;
-    padding-right: 7px;
+    padding: 0 7px;
+    border: 0;
+    background: transparent;
     color: #aaa;
     font-size: 29px;
     font-weight: normal;
+    cursor: pointer;
 }
 
-.abierto .titulo-paso {
-    padding-bottom: 5px;
-}
-
-.formulario,
 .contenido-oculto {
     padding: 0 17px 14px;
+}
+
+.paso.cerrado .contenido-oculto {
+    display: none;
 }
 
 .campo {
@@ -227,7 +235,9 @@ textarea {
     margin-top: 4px;
 }
 
-button {
+.btn-siguiente,
+.btn-registrar,
+.btn-atras {
     border: 0;
     border-radius: 4px;
     padding: 8px 17px;
@@ -247,13 +257,33 @@ button {
     color: white;
 }
 
-.cerrado .contenido-oculto {
-    display: none;
+.resumen {
+    margin-bottom: 15px;
+    padding: 11px 13px;
+    background: #f5eeee;
+    border: 1px solid #dec9ce;
+    border-radius: 7px;
 }
 
-/* =========================
-   RESPONSIVE
-   ========================= */
+.resumen div {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.resumen strong {
+    color: var(--rojo-boton);
+    font-size: 18px;
+}
+
+.nota-beta {
+    margin: 5px 0 14px;
+    padding: 8px 10px;
+    background: #f4f4f4;
+    border-radius: 5px;
+    color: #666;
+    font-size: 12px;
+}
 
 @media (max-width: 750px) {
     .sidebar {
