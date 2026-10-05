@@ -26,3 +26,9 @@ Pendiente:
 - Verificar que las tablas y relaciones funcionen correctamente.
 - Comenzar la implementación de la aplicación.
 
+28/09/2026
+- Se conecto la base de datos, se creo un index que muestre que la conexion fue exitosa.
+- Se cargaron todos los articulos que la libreria ofrece, esto es para que la dueña pueda seleccionar los productos que desea a la hora de cargar un nuevo pedido.
+
+05/10/2026
+- Se creo la primera version de la pagina de "Nuevo Pedido". Todavía NO guarda pedidos y NO modifica la base de datos. El index.php requiere el conexion.php que ya existe en el proyecto.
