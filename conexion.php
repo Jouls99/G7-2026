@@ -3,7 +3,7 @@
 $servidor = "localhost";
 $usuario = "root";
 $password = "";
-$baseDatos = "sublimacionv2";
+$baseDatos = "sublimacionv3";
 
 $conn = new mysqli($servidor, $usuario, $password, $baseDatos);
 
