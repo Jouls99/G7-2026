@@ -31,4 +31,11 @@ Pendiente:
 - Se cargaron todos los articulos que la libreria ofrece, esto es para que la dueña pueda seleccionar los productos que desea a la hora de cargar un nuevo pedido.
 
 05/10/2026
-- Se creo la primera version de la pagina de "Nuevo Pedido". Todavía NO guarda pedidos y NO modifica la base de datos. El index.php requiere el conexion.php que ya existe en el proyecto.
+- Se creo la primera versión de la pagina de "Nuevo Pedido". Todavía NO guarda pedidos y NO modifica la base de datos. El index.php requiere el conexion.php que ya existe en el proyecto.
+
+Pendiente: 
+- Comenzar a desarrollar la pestaña de "Registrar Nuevo Usuario".
+- Comenzar a desarrollar el "Iniciar Sesión".
+- Comenzar a desarrollar la pestaña de "Seguimiento de Pedidos".
+- Comenzar a desarrollar la pestaña de "Registrar Nuevo Usuario".
+- Continuar el desarrollo de "Nuevo Pedido".
