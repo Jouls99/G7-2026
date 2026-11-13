@@ -1,226 +1,205 @@
--- Base de datos Kapykuá - Parte 2
--- Versión 3 corregida e integrada
--- Basada en el nuevo diagrama de clases y en la v3 de la base de datos.
--- Incluye:
---   * Usuario
---   * MedioPago
---   * Diseño opcional en DetallePedido
---   * comprobante en Pago
---   * nombres alineados con el diagrama
---   * catálogo completo de 178 productos
---   * datos iniciales de estados, medios de pago y usuario técnico
--- Motor previsto: MariaDB / MySQL (XAMPP)
+-- phpMyAdmin SQL Dump
+-- version 5.2.1
+-- https://www.phpmyadmin.net/
+--
+-- Servidor: 127.0.0.1
+-- Tiempo de generación: 13-11-2026 a las 22:13:04
+-- Versión del servidor: 10.4.32-MariaDB
+-- Versión de PHP: 8.0.30
 
-CREATE DATABASE IF NOT EXISTS sublimacionv3
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_general_ci;
+SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+START TRANSACTION;
+SET time_zone = "+00:00";
 
-USE sublimacionv3;
 
-SET FOREIGN_KEY_CHECKS = 0;
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
 
-DROP TABLE IF EXISTS pago;
-DROP TABLE IF EXISTS detallepedido;
-DROP TABLE IF EXISTS pedido;
-DROP TABLE IF EXISTS diseño;
-DROP TABLE IF EXISTS producto;
-DROP TABLE IF EXISTS mediopago;
-DROP TABLE IF EXISTS estadopedido;
-DROP TABLE IF EXISTS usuario;
-DROP TABLE IF EXISTS cliente;
+--
+-- Base de datos: `sublimacionv3`
+--
 
-SET FOREIGN_KEY_CHECKS = 1;
+-- --------------------------------------------------------
 
--- ============================================
--- CLIENTE
--- Un cliente puede tener 0..* pedidos.
--- ============================================
-CREATE TABLE cliente (
-    idCliente INT NOT NULL AUTO_INCREMENT,
-    nombre VARCHAR(20) NOT NULL,
-    telefono VARCHAR(20),
-    PRIMARY KEY (idCliente)
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_general_ci;
+--
+-- Estructura de tabla para la tabla `cliente`
+--
 
--- ============================================
--- PRODUCTO
--- Un producto puede aparecer en 0..* detalles.
--- Se usa VARCHAR(150) para conservar el catálogo.
--- ============================================
-CREATE TABLE producto (
-    idProducto INT NOT NULL AUTO_INCREMENT,
-    nombre VARCHAR(150) NOT NULL,
-    descripcion VARCHAR(60),
-    precio DECIMAL(10,2),
-    stock INT,
-    PRIMARY KEY (idProducto)
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_general_ci;
+CREATE TABLE `cliente` (
+  `idCliente` int(11) NOT NULL,
+  `nombre` varchar(20) NOT NULL,
+  `telefono` varchar(20) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- ============================================
--- DISEÑO
--- El diseño puede ser opcional en un detalle.
--- ============================================
-CREATE TABLE diseño (
-    idDiseño INT NOT NULL AUTO_INCREMENT,
-    nombre VARCHAR(20),
-    descripcion VARCHAR(150),
-    archivo VARCHAR(255),
-    PRIMARY KEY (idDiseño)
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_general_ci;
+--
+-- Volcado de datos para la tabla `cliente`
+--
 
--- ============================================
--- ESTADO DEL PEDIDO
--- ============================================
-CREATE TABLE estadopedido (
-    idEstado INT NOT NULL AUTO_INCREMENT,
-    descripcionEstado VARCHAR(150) NOT NULL,
-    PRIMARY KEY (idEstado)
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_general_ci;
+INSERT INTO `cliente` (`idCliente`, `nombre`, `telefono`) VALUES
+(1, 'Juan Carlos', '3794121212'),
+(2, 'Pedro Prueba', '3794000000'),
+(3, 'Gabriel Prueba', '3794123456');
 
-INSERT INTO estadopedido (idEstado, descripcionEstado) VALUES
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `detallepedido`
+--
+
+CREATE TABLE `detallepedido` (
+  `idDetalle` int(11) NOT NULL,
+  `cantidad` int(11) NOT NULL,
+  `precioUnitario` decimal(10,2) NOT NULL,
+  `idPedido` int(11) NOT NULL,
+  `idProducto` int(11) NOT NULL,
+  `idDiseño` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Volcado de datos para la tabla `detallepedido`
+--
+
+INSERT INTO `detallepedido` (`idDetalle`, `cantidad`, `precioUnitario`, `idPedido`, `idProducto`, `idDiseño`) VALUES
+(1, 1, 10.00, 1, 87, 1),
+(2, 2, 10000.00, 2, 1, 2),
+(3, 3, 2000.00, 3, 131, 3);
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `diseño`
+--
+
+CREATE TABLE `diseño` (
+  `idDiseño` int(11) NOT NULL,
+  `nombre` varchar(20) DEFAULT NULL,
+  `descripcion` varchar(150) DEFAULT NULL,
+  `archivo` varchar(255) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Volcado de datos para la tabla `diseño`
+--
+
+INSERT INTO `diseño` (`idDiseño`, `nombre`, `descripcion`, `archivo`) VALUES
+(1, 'Messi', 'Un vaso Térmico sublimado con una foto de Messi y el Mundial.', NULL),
+(2, 'Diseño personalizado', 'Tazas de Messi y Maradona', NULL),
+(3, 'Diseño personalizado', '3 pines, uno de Dragon Ball, otro de Naruto, otro de Caballeros del Zodiaco', NULL);
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `estadopedido`
+--
+
+CREATE TABLE `estadopedido` (
+  `idEstado` int(11) NOT NULL,
+  `descripcionEstado` varchar(150) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Volcado de datos para la tabla `estadopedido`
+--
+
+INSERT INTO `estadopedido` (`idEstado`, `descripcionEstado`) VALUES
 (1, 'Pendiente'),
 (2, 'En Diseño'),
 (3, 'Sublimando'),
 (4, 'Terminado'),
-(5, 'Entregado');
+(5, 'Entregado'),
+(6, 'Cancelado');
 
--- ============================================
--- MEDIO DE PAGO
--- Un medio de pago puede utilizarse en 0..* pagos.
--- ============================================
-CREATE TABLE mediopago (
-    idMedioPago INT NOT NULL AUTO_INCREMENT,
-    nombre VARCHAR(20) NOT NULL,
-    PRIMARY KEY (idMedioPago)
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_general_ci;
+-- --------------------------------------------------------
 
-INSERT INTO mediopago (idMedioPago, nombre) VALUES
+--
+-- Estructura de tabla para la tabla `mediopago`
+--
+
+CREATE TABLE `mediopago` (
+  `idMedioPago` int(11) NOT NULL,
+  `nombre` varchar(20) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Volcado de datos para la tabla `mediopago`
+--
+
+INSERT INTO `mediopago` (`idMedioPago`, `nombre`) VALUES
 (1, 'Efectivo'),
 (2, 'Transferencia'),
 (3, 'Debito'),
 (4, 'Credito');
 
--- ============================================
--- USUARIO
--- Usuario técnico inicial para poder registrar
--- pedidos mientras todavía no se implementa login.
--- ============================================
-CREATE TABLE usuario (
-    idUsuario INT NOT NULL AUTO_INCREMENT,
-    nombre VARCHAR(100) NOT NULL,
-    telefono VARCHAR(30),
-    email VARCHAR(150) NOT NULL,
-    passwordHash VARCHAR(255) NOT NULL,
-    rol ENUM('ADMIN','EMPLEADO') DEFAULT 'EMPLEADO',
-    estado TINYINT(1) NOT NULL DEFAULT 1,
-    fechaRegistro DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    tokenRecuperacion VARCHAR(64),
-    tokenExpiracion DATETIME,
-    PRIMARY KEY (idUsuario),
-    UNIQUE KEY email (email)
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
+-- --------------------------------------------------------
 
--- Usuario inicial de prueba.
--- La contraseña de este usuario es: admin123
-INSERT INTO usuario
-    (idUsuario, nombre, telefono, email, passwordHash, rol, estado)
-VALUES
-    (1, 'Administrador', NULL, 'admin@kapykua.local',
-     '$2y$12$ACxhFoKtRkd.S7GiWZHww.3y3R345ZYJz9gPe1OBivhHCraGJfejq', 'ADMIN', 1);
+--
+-- Estructura de tabla para la tabla `pago`
+--
 
--- ============================================
--- PEDIDO
--- Cada pedido pertenece a un cliente, un estado
--- y un usuario.
--- ============================================
-CREATE TABLE pedido (
-    idPedido INT NOT NULL AUTO_INCREMENT,
-    fechaRegistro DATETIME DEFAULT CURRENT_TIMESTAMP,
-    fechaEntrega DATE NOT NULL,
-    precioTotal DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-    idCliente INT NOT NULL,
-    idEstado INT NOT NULL,
-    idUsuario INT NOT NULL,
-    PRIMARY KEY (idPedido),
-    KEY idx_pedido_cliente (idCliente),
-    KEY idx_pedido_estado (idEstado),
-    KEY idx_pedido_usuario (idUsuario),
-    CONSTRAINT fk_pedido_cliente
-        FOREIGN KEY (idCliente) REFERENCES cliente (idCliente),
-    CONSTRAINT fk_pedido_estado
-        FOREIGN KEY (idEstado) REFERENCES estadopedido (idEstado),
-    CONSTRAINT fk_pedido_usuario
-        FOREIGN KEY (idUsuario) REFERENCES usuario (idUsuario)
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_general_ci;
+CREATE TABLE `pago` (
+  `idPago` int(11) NOT NULL,
+  `monto` decimal(10,2) NOT NULL,
+  `fechaHoraPago` datetime DEFAULT current_timestamp(),
+  `comprobante` varchar(255) DEFAULT NULL,
+  `idPedido` int(11) NOT NULL,
+  `idMedioPago` int(11) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- ============================================
--- DETALLE DEL PEDIDO
--- El diseño es opcional según el nuevo diagrama.
--- ============================================
-CREATE TABLE detallepedido (
-    idDetalle INT NOT NULL AUTO_INCREMENT,
-    cantidad INT NOT NULL,
-    precioUnitario DECIMAL(10,2) NOT NULL,
-    idPedido INT NOT NULL,
-    idProducto INT NOT NULL,
-    idDiseño INT DEFAULT NULL,
-    PRIMARY KEY (idDetalle),
-    KEY idx_detalle_pedido (idPedido),
-    KEY idx_detalle_producto (idProducto),
-    KEY idx_detalle_diseño (idDiseño),
-    CONSTRAINT fk_detalle_pedido
-        FOREIGN KEY (idPedido) REFERENCES pedido (idPedido),
-    CONSTRAINT fk_detalle_producto
-        FOREIGN KEY (idProducto) REFERENCES producto (idProducto),
-    CONSTRAINT fk_detalle_diseño
-        FOREIGN KEY (idDiseño) REFERENCES diseño (idDiseño)
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_general_ci;
+--
+-- Volcado de datos para la tabla `pago`
+--
 
--- ============================================
--- PAGO
--- Un pedido puede tener 0..* pagos.
--- Cada pago utiliza un único medio de pago.
--- ============================================
-CREATE TABLE pago (
-    idPago INT NOT NULL AUTO_INCREMENT,
-    monto DECIMAL(10,2) NOT NULL,
-    fechaHoraPago DATETIME DEFAULT CURRENT_TIMESTAMP,
-    comprobante VARCHAR(255),
-    idPedido INT NOT NULL,
-    idMedioPago INT NOT NULL,
-    PRIMARY KEY (idPago),
-    KEY idx_pago_pedido (idPedido),
-    KEY idx_pago_medio (idMedioPago),
-    CONSTRAINT fk_pago_pedido
-        FOREIGN KEY (idPedido) REFERENCES pedido (idPedido),
-    CONSTRAINT fk_pago_medio
-        FOREIGN KEY (idMedioPago) REFERENCES mediopago (idMedioPago)
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_general_ci;
+INSERT INTO `pago` (`idPago`, `monto`, `fechaHoraPago`, `comprobante`, `idPedido`, `idMedioPago`) VALUES
+(1, 5.00, '2026-10-05 15:30:50', NULL, 1, 2),
+(2, 5000.00, '2026-10-05 16:08:39', NULL, 2, 2),
+(3, 3000.00, '2026-10-05 16:13:24', NULL, 3, 2);
 
--- ============================================
--- CATÁLOGO DE PRODUCTOS
--- 178 productos provenientes del catálogo cargado
--- anteriormente en sublimacionv2.
--- ============================================
-INSERT INTO producto (`idProducto`, `nombre`, `descripcion`, `precio`, `stock`) VALUES
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `pedido`
+--
+
+CREATE TABLE `pedido` (
+  `idPedido` int(11) NOT NULL,
+  `fechaRegistro` datetime DEFAULT current_timestamp(),
+  `fechaEntrega` date NOT NULL,
+  `precioTotal` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `idCliente` int(11) NOT NULL,
+  `idEstado` int(11) NOT NULL,
+  `idUsuario` int(11) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Volcado de datos para la tabla `pedido`
+--
+
+INSERT INTO `pedido` (`idPedido`, `fechaRegistro`, `fechaEntrega`, `precioTotal`, `idCliente`, `idEstado`, `idUsuario`) VALUES
+(1, '2026-10-05 15:30:50', '2026-10-31', 10.00, 1, 1, 1),
+(2, '2026-10-05 16:08:39', '2026-10-05', 20000.00, 2, 1, 1),
+(3, '2026-10-05 16:13:24', '2026-10-19', 6000.00, 3, 1, 1);
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `producto`
+--
+
+CREATE TABLE `producto` (
+  `idProducto` int(11) NOT NULL,
+  `nombre` varchar(150) NOT NULL,
+  `descripcion` varchar(60) DEFAULT NULL,
+  `precio` decimal(10,2) DEFAULT NULL,
+  `stock` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Volcado de datos para la tabla `producto`
+--
+
+INSERT INTO `producto` (`idProducto`, `nombre`, `descripcion`, `precio`, `stock`) VALUES
 (1, 'Taza', 'Taza para sublimación', NULL, NULL),
 (2, 'Mate', 'Mate para sublimación', NULL, NULL),
 (3, 'Mouse Pad', 'Mouse Pad para sublimación', NULL, NULL),
@@ -400,5 +379,185 @@ INSERT INTO producto (`idProducto`, `nombre`, `descripcion`, `precio`, `stock`) 
 (177, 'Puperas Algodón', NULL, NULL, NULL),
 (178, 'Pijamas Verano Niños del 4 al 14', NULL, NULL, NULL);
 
+-- --------------------------------------------------------
 
+--
+-- Estructura de tabla para la tabla `usuario`
+--
+
+CREATE TABLE `usuario` (
+  `idUsuario` int(11) NOT NULL,
+  `nombre` varchar(100) NOT NULL,
+  `telefono` varchar(30) DEFAULT NULL,
+  `email` varchar(150) NOT NULL,
+  `passwordHash` varchar(255) NOT NULL,
+  `rol` enum('ADMIN','EMPLEADO') DEFAULT 'EMPLEADO',
+  `estado` tinyint(1) NOT NULL DEFAULT 1,
+  `fechaRegistro` datetime NOT NULL DEFAULT current_timestamp(),
+  `tokenRecuperacion` varchar(64) DEFAULT NULL,
+  `tokenExpiracion` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Volcado de datos para la tabla `usuario`
+--
+
+INSERT INTO `usuario` (`idUsuario`, `nombre`, `telefono`, `email`, `passwordHash`, `rol`, `estado`, `fechaRegistro`, `tokenRecuperacion`, `tokenExpiracion`) VALUES
+(1, 'Administrador', NULL, 'admin@kapykua.local', '$2y$12$ACxhFoKtRkd.S7GiWZHww.3y3R345ZYJz9gPe1OBivhHCraGJfejq', 'ADMIN', 1, '2026-10-05 15:08:28', NULL, NULL);
+
+--
+-- Índices para tablas volcadas
+--
+
+--
+-- Indices de la tabla `cliente`
+--
+ALTER TABLE `cliente`
+  ADD PRIMARY KEY (`idCliente`);
+
+--
+-- Indices de la tabla `detallepedido`
+--
+ALTER TABLE `detallepedido`
+  ADD PRIMARY KEY (`idDetalle`),
+  ADD KEY `idx_detalle_pedido` (`idPedido`),
+  ADD KEY `idx_detalle_producto` (`idProducto`),
+  ADD KEY `idx_detalle_diseño` (`idDiseño`);
+
+--
+-- Indices de la tabla `diseño`
+--
+ALTER TABLE `diseño`
+  ADD PRIMARY KEY (`idDiseño`);
+
+--
+-- Indices de la tabla `estadopedido`
+--
+ALTER TABLE `estadopedido`
+  ADD PRIMARY KEY (`idEstado`);
+
+--
+-- Indices de la tabla `mediopago`
+--
+ALTER TABLE `mediopago`
+  ADD PRIMARY KEY (`idMedioPago`);
+
+--
+-- Indices de la tabla `pago`
+--
+ALTER TABLE `pago`
+  ADD PRIMARY KEY (`idPago`),
+  ADD KEY `idx_pago_pedido` (`idPedido`),
+  ADD KEY `idx_pago_medio` (`idMedioPago`);
+
+--
+-- Indices de la tabla `pedido`
+--
+ALTER TABLE `pedido`
+  ADD PRIMARY KEY (`idPedido`),
+  ADD KEY `idx_pedido_cliente` (`idCliente`),
+  ADD KEY `idx_pedido_estado` (`idEstado`),
+  ADD KEY `idx_pedido_usuario` (`idUsuario`);
+
+--
+-- Indices de la tabla `producto`
+--
+ALTER TABLE `producto`
+  ADD PRIMARY KEY (`idProducto`);
+
+--
+-- Indices de la tabla `usuario`
+--
+ALTER TABLE `usuario`
+  ADD PRIMARY KEY (`idUsuario`),
+  ADD UNIQUE KEY `email` (`email`);
+
+--
+-- AUTO_INCREMENT de las tablas volcadas
+--
+
+--
+-- AUTO_INCREMENT de la tabla `cliente`
+--
+ALTER TABLE `cliente`
+  MODIFY `idCliente` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+
+--
+-- AUTO_INCREMENT de la tabla `detallepedido`
+--
+ALTER TABLE `detallepedido`
+  MODIFY `idDetalle` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+
+--
+-- AUTO_INCREMENT de la tabla `diseño`
+--
+ALTER TABLE `diseño`
+  MODIFY `idDiseño` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+
+--
+-- AUTO_INCREMENT de la tabla `estadopedido`
+--
+ALTER TABLE `estadopedido`
+  MODIFY `idEstado` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+
+--
+-- AUTO_INCREMENT de la tabla `mediopago`
+--
+ALTER TABLE `mediopago`
+  MODIFY `idMedioPago` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+
+--
+-- AUTO_INCREMENT de la tabla `pago`
+--
+ALTER TABLE `pago`
+  MODIFY `idPago` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+
+--
+-- AUTO_INCREMENT de la tabla `pedido`
+--
+ALTER TABLE `pedido`
+  MODIFY `idPedido` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+
+--
+-- AUTO_INCREMENT de la tabla `producto`
+--
+ALTER TABLE `producto`
+  MODIFY `idProducto` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=179;
+
+--
+-- AUTO_INCREMENT de la tabla `usuario`
+--
+ALTER TABLE `usuario`
+  MODIFY `idUsuario` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- Restricciones para tablas volcadas
+--
+
+--
+-- Filtros para la tabla `detallepedido`
+--
+ALTER TABLE `detallepedido`
+  ADD CONSTRAINT `fk_detalle_diseño` FOREIGN KEY (`idDiseño`) REFERENCES `diseño` (`idDiseño`),
+  ADD CONSTRAINT `fk_detalle_pedido` FOREIGN KEY (`idPedido`) REFERENCES `pedido` (`idPedido`),
+  ADD CONSTRAINT `fk_detalle_producto` FOREIGN KEY (`idProducto`) REFERENCES `producto` (`idProducto`);
+
+--
+-- Filtros para la tabla `pago`
+--
+ALTER TABLE `pago`
+  ADD CONSTRAINT `fk_pago_medio` FOREIGN KEY (`idMedioPago`) REFERENCES `mediopago` (`idMedioPago`),
+  ADD CONSTRAINT `fk_pago_pedido` FOREIGN KEY (`idPedido`) REFERENCES `pedido` (`idPedido`);
+
+--
+-- Filtros para la tabla `pedido`
+--
+ALTER TABLE `pedido`
+  ADD CONSTRAINT `fk_pedido_cliente` FOREIGN KEY (`idCliente`) REFERENCES `cliente` (`idCliente`),
+  ADD CONSTRAINT `fk_pedido_estado` FOREIGN KEY (`idEstado`) REFERENCES `estadopedido` (`idEstado`),
+  ADD CONSTRAINT `fk_pedido_usuario` FOREIGN KEY (`idUsuario`) REFERENCES `usuario` (`idUsuario`);
 COMMIT;
+
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;

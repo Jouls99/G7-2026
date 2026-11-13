@@ -31,6 +31,7 @@ Pendiente:
 - Se cargaron todos los articulos que la libreria ofrece, esto es para que la dueña pueda seleccionar los productos que desea a la hora de cargar un nuevo pedido.
 
 05/10/2026
+
 - Se creo la primera versión de la pagina de "Nuevo Pedido". Todavía NO guarda pedidos y NO modifica la base de datos. El index.php requiere el conexion.php que ya existe en el proyecto.
 
 Pendiente: 
@@ -39,3 +40,27 @@ Pendiente:
 - Comenzar a desarrollar la pestaña de "Seguimiento de Pedidos".
 - Comenzar a desarrollar la pestaña de "Registrar Nuevo Usuario".
 - Continuar el desarrollo de "Nuevo Pedido".
+
+- Se creo la primera version de la pagina de "Nuevo Pedido". Todavía NO guarda pedidos y NO modifica la base de datos. El index.php requiere el conexion.php que ya existe en el proyecto.
+
+19/10/2026
+-Se puso en funcionamiento la segunda pantalla de Pedidos.
+- Se implementó la navegación desde el menú lateral hacia la pantalla de Seguimiento de Pedidos.
+- Se conectó la sección para recuperar y mostrar los pedidos registrados.
+- Se implementó la visualización de los pedidos mediante tarjetas individuales.
+- Se incorporó la identificación de cada pedido mediante un código PED-00000. (Puede cambiar)
+- Se agregó la visualización del estado actual de cada pedido.
+- Se implementó el botón "Ver Detalles", que permite desplegar información adicional del pedido, incluyendo teléfono del cliente, estado, total y detalle de productos y diseños.
+- Se incorporó un acceso a la sección "Nuevo Pedido" desde la pantalla de seguimiento. Pero esto ocasiona un bug con la pantalla lateral,
+se debe arreglar. 
+
+26/10/2026
+- Se modificó la tabla estadopedido de la base de datos para incorporar un nuevo estado denominado "Cancelado", ampliando de cinco a seis los estados disponibles.
+- Se implementó la funcionalidad para actualizar el estado de los pedidos desde la pantalla "Pedidos".
+- Se implementó la actualización del campo idEstado en la tabla pedido
+- Se incorporó la identificación visual de los estados mediante colores
+
+Pendiente:
+- Mejorar la interfaz de actualización de estados para que se ajuste al diseño conceptual original.
+- Refinar la presentación visual de los estados y sus controles.
+- Continuar las pruebas y ajustes de esta funcionalidad.
