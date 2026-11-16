@@ -64,3 +64,18 @@ Pendiente:
 - Mejorar la interfaz de actualización de estados para que se ajuste al diseño conceptual original.
 - Refinar la presentación visual de los estados y sus controles.
 - Continuar las pruebas y ajustes de esta funcionalidad.
+
+02/11/2026
+- Se implementó la visualización de los pedidos registrados.
+- Se muestran los datos del cliente, fecha de entrega, productos, cantidades, importe total y estado.
+- Se incorporó la opción de consultar los detalles de cada pedido.
+- Se agregó la posibilidad de actualizar el estado del pedido.
+
+13/11/2026
+- Se implemento la Pantalla de Notificacion. Funcionalmente.
+- Se implementó un listado de pedidos terminados.
+- Se muestran el importe total y el monto abonado por el cliente.
+- Se incorporó el registro de pagos adicionales y el cálculo automático del saldo pendiente.
+- Se agregó la opción de confirmar la entrega una vez completado el pago.
+- Se incorporó un botón para preparar notificaciones mediante WhatsApp. Usa el numero registrado y redacta un mensaje automatico.
+

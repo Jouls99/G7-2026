@@ -571,3 +571,188 @@ textarea {
 .btn-guardar-estado:hover {
     filter: brightness(.92);
 }
+
+
+/* Pantalla Notificar - Beta 1 */
+.notificar {
+    padding: 10px 3px 28px;
+}
+.notificar h1 {
+    margin: 4px 0 20px;
+    text-align: center;
+    color: #351017;
+    font-family: "Trebuchet MS", Arial, sans-serif;
+    font-size: 25px;
+    font-weight: 900;
+}
+.tabla-notificaciones-contenedor {
+    width: 100%;
+    max-height: calc(100vh - 165px);
+    overflow: auto;
+    background: #fff;
+    border: 1px solid #d2c8c8;
+    border-radius: 13px;
+    box-shadow: 0 2px 4px rgba(0,0,0,.20);
+}
+.tabla-notificaciones {
+    width: 100%;
+    min-width: 790px;
+    border-collapse: collapse;
+    background: #fff;
+}
+.tabla-notificaciones th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 17px 12px;
+    background: #fff;
+    color: #171717;
+    font-family: "Trebuchet MS", Arial, sans-serif;
+    font-size: 14px;
+    font-style: italic;
+    font-weight: 900;
+    text-align: left;
+    border-bottom: 2px solid #d8d0d0;
+    text-transform: uppercase;
+}
+.tabla-notificaciones td {
+    padding: 12px 11px;
+    border-bottom: 1px solid #d8d0d0;
+    vertical-align: middle;
+    font-size: 14px;
+}
+.tabla-notificaciones tr:last-child td {
+    border-bottom: 0;
+}
+.tabla-notificaciones tbody tr:hover {
+    background: #fffafa;
+}
+.celda-pedido {
+    white-space: nowrap;
+    font-weight: bold;
+}
+.importe-pagado {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    white-space: nowrap;
+}
+.btn-editar-pago {
+    border: 0;
+    padding: 1px 3px;
+    background: transparent;
+    color: #222;
+    font-size: 21px;
+    line-height: 1;
+    cursor: pointer;
+}
+.form-pago {
+    width: 205px;
+    margin-top: 8px;
+    padding: 9px;
+    border: 1px solid #e0cccc;
+    border-radius: 7px;
+    background: #fff8f7;
+}
+.form-pago[hidden] {
+    display: none;
+}
+.form-pago label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 12px;
+    font-weight: bold;
+}
+.form-pago input,
+.form-pago select {
+    width: 100%;
+    margin: 6px 0;
+    padding: 7px;
+    font-size: 12px;
+}
+.form-pago small {
+    display: block;
+    color: #624b4b;
+    font-size: 11px;
+    line-height: 1.35;
+}
+.pago-completo {
+    color: #168c48;
+    font-weight: 900;
+    font-size: 18px;
+}
+.ayuda-entrega {
+    display: block;
+    margin-top: 4px;
+    color: #765252;
+    font-size: 10px;
+    line-height: 1.25;
+}
+.btn-guardar-pago {
+    width: 100%;
+    border: 0;
+    border-radius: 4px;
+    padding: 7px;
+    background: var(--rojo-boton);
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+}
+.form-estado-notificar {
+    min-width: 125px;
+}
+.selector-estado {
+    width: 100%;
+    min-width: 120px;
+    padding: 7px 23px 7px 9px;
+    border: 0;
+    border-radius: 18px;
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+}
+.selector-estado.estado-pendiente { background: #83d0e3; color: #17252a; }
+.selector-estado.estado-en-diseno { background: #f39a42; color: #2b1607; }
+.selector-estado.estado-sublimando { background: #ffed00; color: #272100; }
+.selector-estado.estado-terminado { background: #91d69b; color: #15351a; }
+.selector-estado.estado-entregado { background: #d5d5d5; color: #252525; }
+.selector-estado.estado-cancelado { background: #e46b6b; color: #4b0909; }
+.btn-whatsapp {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-width: 120px;
+    padding: 8px 10px;
+    border-radius: 5px;
+    background: #168c48;
+    color: #fff;
+    font-weight: bold;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.btn-whatsapp:hover {
+    background: #11763c;
+}
+.btn-whatsapp span {
+    font-size: 18px;
+}
+.sin-telefono {
+    display: inline-block;
+    max-width: 125px;
+    color: #777;
+    font-size: 12px;
+}
+.nota-notificar {
+    margin: 10px 4px;
+    color: #5e4545;
+    font-size: 12px;
+}
+@media (max-width: 750px) {
+    .tabla-notificaciones-contenedor {
+        max-height: calc(100vh - 145px);
+    }
+    .notificar h1 {
+        font-size: 22px;
+    }
+}

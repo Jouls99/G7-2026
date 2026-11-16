@@ -8,8 +8,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && ($_POST["accion"] ?? "") === "actua
     $idPedidoActualizar = (int)($_POST["idPedido"] ?? 0);
     $idEstadoNuevo = (int)($_POST["idEstado"] ?? 0);
 
-    if ($idPedidoActualizar <= 0 || $idEstadoNuevo <= 0) {
-        $mensaje = "No se pudo actualizar el estado: datos inválidos.";
+    if ($idPedidoActualizar <= 0 || $idEstadoNuevo <= 0 || ($_POST["vista"] ?? "") !== "pedidos") {
+        $mensaje = "No se pudo actualizar el estado: datos inválidos o acción fuera de la pantalla Pedidos.";
         $tipoMensaje = "error";
     } else {
         $stmt = $conn->prepare(
@@ -38,6 +38,139 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && ($_POST["accion"] ?? "") === "actua
                 $tipoMensaje = "error";
             }
             $stmt->close();
+        }
+    }
+
+} elseif ($_SERVER["REQUEST_METHOD"] === "POST" && ($_POST["accion"] ?? "") === "actualizar_pagado") {
+    // En Notificar se registra únicamente el importe recibido en este nuevo cobro.
+    // Los pagos anteriores (por ejemplo, la seña) se conservan y se suman al mostrar el total abonado.
+    $idPedidoPago = (int)($_POST["idPedido"] ?? 0);
+    $nuevoPago = (float)($_POST["nuevo_pago"] ?? 0);
+    $medioPagoNuevo = (int)($_POST["medio_pago_pago"] ?? 0);
+
+    if ($idPedidoPago <= 0 || $nuevoPago <= 0 || $medioPagoNuevo <= 0) {
+        $mensaje = "Ingresá un importe de pago válido y seleccioná el medio de pago.";
+        $tipoMensaje = "error";
+    } else {
+        $conn->begin_transaction();
+        try {
+            $stmt = $conn->prepare(
+                "SELECT p.precioTotal, ep.descripcionEstado AS estado
+                 FROM pedido p
+                 INNER JOIN estadopedido ep ON ep.idEstado = p.idEstado
+                 WHERE p.idPedido = ?
+                 FOR UPDATE"
+            );
+            $stmt->bind_param("i", $idPedidoPago);
+            $stmt->execute();
+            $datosPedidoPago = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+
+            if (!$datosPedidoPago || mb_strtolower($datosPedidoPago["estado"], "UTF-8") !== "terminado") {
+                throw new Exception("Solo se puede completar el pago de pedidos terminados pendientes de entrega.");
+            }
+
+            $stmt = $conn->prepare(
+                "SELECT COALESCE(SUM(monto), 0) AS pagado FROM pago WHERE idPedido = ?"
+            );
+            $stmt->bind_param("i", $idPedidoPago);
+            $stmt->execute();
+            $pagadoActual = (float)$stmt->get_result()->fetch_assoc()["pagado"];
+            $stmt->close();
+
+            $totalPedido = (float)$datosPedidoPago["precioTotal"];
+            $saldoPendiente = round($totalPedido - $pagadoActual, 2);
+            $nuevoPago = round($nuevoPago, 2);
+
+            if ($saldoPendiente <= 0.001) {
+                throw new Exception("El pedido ya está completamente pagado.");
+            }
+            if ($nuevoPago > $saldoPendiente + 0.001) {
+                throw new Exception("El nuevo pago no puede superar el saldo pendiente de $ " . number_format($saldoPendiente, 2, ",", ".") . ".");
+            }
+
+            $stmt = $conn->prepare(
+                "INSERT INTO pago (monto, idPedido, idMedioPago) VALUES (?, ?, ?)"
+            );
+            $stmt->bind_param("dii", $nuevoPago, $idPedidoPago, $medioPagoNuevo);
+            $stmt->execute();
+            $stmt->close();
+            $conn->commit();
+
+            $mensaje = "Pago registrado correctamente: $ " . number_format($nuevoPago, 2, ",", ".") . ".";
+            $tipoMensaje = "exito";
+        } catch (Exception $e) {
+            $conn->rollback();
+            $mensaje = $e->getMessage();
+            $tipoMensaje = "error";
+        }
+    }
+
+} elseif ($_SERVER["REQUEST_METHOD"] === "POST" && ($_POST["accion"] ?? "") === "confirmar_entrega") {
+    // En esta pantalla solo se permite la transición Terminado -> Entregado.
+    $idPedidoEntrega = (int)($_POST["idPedido"] ?? 0);
+
+    if ($idPedidoEntrega <= 0) {
+        $mensaje = "No se pudo confirmar la entrega: pedido inválido.";
+        $tipoMensaje = "error";
+    } else {
+        $conn->begin_transaction();
+        try {
+            $stmt = $conn->prepare(
+                "SELECT p.precioTotal, ep.descripcionEstado AS estado
+                 FROM pedido p
+                 INNER JOIN estadopedido ep ON ep.idEstado = p.idEstado
+                 WHERE p.idPedido = ?
+                 FOR UPDATE"
+            );
+            $stmt->bind_param("i", $idPedidoEntrega);
+            $stmt->execute();
+            $datosEntrega = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+
+            if (!$datosEntrega || mb_strtolower($datosEntrega["estado"], "UTF-8") !== "terminado") {
+                throw new Exception("El pedido ya no está pendiente de entrega.");
+            }
+
+            $stmt = $conn->prepare(
+                "SELECT COALESCE(SUM(monto), 0) AS pagado FROM pago WHERE idPedido = ?"
+            );
+            $stmt->bind_param("i", $idPedidoEntrega);
+            $stmt->execute();
+            $totalPagadoEntrega = (float)$stmt->get_result()->fetch_assoc()["pagado"];
+            $stmt->close();
+
+            $totalPedidoEntrega = (float)$datosEntrega["precioTotal"];
+            if ($totalPagadoEntrega + 0.001 < $totalPedidoEntrega) {
+                $saldoEntrega = $totalPedidoEntrega - $totalPagadoEntrega;
+                throw new Exception("No se puede confirmar la entrega: todavía queda un saldo de $ " . number_format($saldoEntrega, 2, ",", ".") . ". Registrá primero el pago pendiente.");
+            }
+
+            $stmt = $conn->prepare(
+                "SELECT idEstado FROM estadopedido WHERE LOWER(descripcionEstado) = 'entregado' LIMIT 1"
+            );
+            $stmt->execute();
+            $estadoEntregado = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+            if (!$estadoEntregado) {
+                throw new Exception("No existe el estado 'Entregado' en la base de datos.");
+            }
+
+            $idEstadoEntregado = (int)$estadoEntregado["idEstado"];
+            $stmt = $conn->prepare(
+                "UPDATE pedido SET idEstado = ? WHERE idPedido = ?"
+            );
+            $stmt->bind_param("ii", $idEstadoEntregado, $idPedidoEntrega);
+            $stmt->execute();
+            $stmt->close();
+            $conn->commit();
+
+            $mensaje = "Entrega del pedido #" . $idPedidoEntrega . " confirmada correctamente.";
+            $tipoMensaje = "exito";
+        } catch (Exception $e) {
+            $conn->rollback();
+            $mensaje = $e->getMessage();
+            $tipoMensaje = "error";
         }
     }
 
@@ -234,12 +367,14 @@ if ($resultadoMedios) {
 
 // Vista solicitada desde el menú.
 $vistaSolicitada = $_GET["vista"] ?? $_POST["vista"] ?? "nuevo";
-$vista = $vistaSolicitada === "pedidos" ? "pedidos" : "nuevo";
+$vista = in_array($vistaSolicitada, ["nuevo", "pedidos", "notificar"], true)
+    ? $vistaSolicitada
+    : "nuevo";
 
 // Pedidos reales con cliente, estado y productos asociados.
 $pedidos = [];
 $estados = [];
-if ($vista === "pedidos") {
+if (in_array($vista, ["pedidos", "notificar"], true)) {
     $resultadoEstados = $conn->query(
         "SELECT idEstado, descripcionEstado FROM estadopedido ORDER BY idEstado ASC"
     );
@@ -288,13 +423,42 @@ if ($vista === "pedidos") {
         }
     }
 }
+
+// Datos reales para la pantalla Notificar: total y suma de pagos registrados.
+$notificaciones = [];
+if ($vista === "notificar") {
+    $resultadoNotificaciones = $conn->query("
+        SELECT
+            p.idPedido,
+            p.precioTotal,
+            c.nombre AS cliente,
+            c.telefono,
+            ep.idEstado,
+            ep.descripcionEstado AS estado,
+            COALESCE(SUM(pa.monto), 0) AS pagado
+        FROM pedido p
+        INNER JOIN cliente c ON c.idCliente = p.idCliente
+        INNER JOIN estadopedido ep ON ep.idEstado = p.idEstado
+        LEFT JOIN pago pa ON pa.idPedido = p.idPedido
+        WHERE LOWER(ep.descripcionEstado) = 'terminado'
+        GROUP BY p.idPedido, p.precioTotal, c.nombre, c.telefono,
+                 ep.idEstado, ep.descripcionEstado
+        ORDER BY p.idPedido DESC
+    ");
+
+    if ($resultadoNotificaciones) {
+        while ($filaNotificacion = $resultadoNotificaciones->fetch_assoc()) {
+            $notificaciones[] = $filaNotificacion;
+        }
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kapykuá - Nuevo Pedido</title>
+    <title>Kapykuá - Gestión de Pedidos</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -318,7 +482,7 @@ if ($vista === "pedidos") {
                 <span>Pedidos</span>
             </a>
 
-            <a href="#" class="menu-item" aria-disabled="true" title="Sección pendiente de desarrollo">
+            <a href="?vista=notificar" class="menu-item <?php echo $vista === "notificar" ? "activo" : ""; ?>" id="menuNotificar">
                 <span class="icono">♧</span>
                 <span>Notificar</span>
             </a>
@@ -532,7 +696,7 @@ if ($vista === "pedidos") {
                 </div>
 
             </form>
-            <?php else: ?>
+            <?php elseif ($vista === "pedidos"): ?>
 
             <section class="seguimiento">
                 <h1>Seguimiento de Pedidos</h1>
@@ -541,12 +705,10 @@ if ($vista === "pedidos") {
                     <div class="sin-pedidos">
                         <h2>Todavía no hay pedidos registrados</h2>
                         <p>Cuando registres un pedido desde «Nuevo Pedido», aparecerá en esta sección.</p>
-                        <a class="btn-registrar enlace-boton" href="?vista=nuevo">Registrar un pedido</a>
                     </div>
                 <?php else: ?>
                     <div class="resumen-pedidos">
                         <span><?php echo count($pedidos); ?> pedido(s) registrado(s)</span>
-                        <a href="?vista=nuevo" class="btn-registrar enlace-boton">＋ Nuevo pedido</a>
                     </div>
 
                     <div class="grilla-pedidos">
@@ -640,6 +802,135 @@ if ($vista === "pedidos") {
                 <?php endif; ?>
             </section>
 
+            <?php else: ?>
+
+            <section class="notificar">
+                <h1>Notificación de Pedidos</h1>
+
+                <?php if (count($notificaciones) === 0): ?>
+                    <div class="sin-pedidos">
+                        <h2>No hay pedidos listos para entregar</h2>
+                        <p>En esta pantalla aparecen los pedidos cuyo estado es «Terminado» y todavía no fueron entregados.</p>
+                        <a class="btn-registrar enlace-boton" href="?vista=nuevo">Registrar un pedido</a>
+                    </div>
+                <?php else: ?>
+                    <div class="tabla-notificaciones-contenedor">
+                        <table class="tabla-notificaciones">
+                            <thead>
+                                <tr>
+                                    <th>Pedido</th>
+                                    <th>Cliente</th>
+                                    <th>Total</th>
+                                    <th>Pagado</th>
+                                    <th>Estado</th>
+                                    <th>WhatsApp</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($notificaciones as $aviso): ?>
+                                    <?php
+                                        $estadoAviso = $aviso["estado"] ?: "Sin estado";
+                                        $claseAviso = strtolower(trim($estadoAviso));
+                                        $claseAviso = strtr($claseAviso, [
+                                            'á' => 'a', 'é' => 'e', 'í' => 'i',
+                                            'ó' => 'o', 'ú' => 'u', 'ñ' => 'n'
+                                        ]);
+                                        $claseAviso = preg_replace('/[^a-z0-9]+/i', '-', $claseAviso);
+
+                                        $telefonoAviso = preg_replace('/\D+/', '', (string)$aviso["telefono"]);
+                                        // Si se guardó un celular argentino local de 10 dígitos,
+                                        // se agrega el prefijo móvil internacional 549.
+                                        if (strlen($telefonoAviso) === 10) {
+                                            $telefonoAviso = "549" . $telefonoAviso;
+                                        } elseif (strlen($telefonoAviso) === 11 && substr($telefonoAviso, 0, 1) === "0") {
+                                            $telefonoAviso = "549" . substr($telefonoAviso, 1);
+                                        }
+
+                                        $saldoAviso = max(0, (float)$aviso["precioTotal"] - (float)$aviso["pagado"]);
+                                        $mensajeWhatsapp = "Hola " . $aviso["cliente"] .
+                                            ", te avisamos desde Kapykuá que tu pedido #PED-" .
+                                            str_pad((string)$aviso["idPedido"], 5, "0", STR_PAD_LEFT) .
+                                            " está terminado y listo para retirar. Estado: " . $estadoAviso .
+                                            ". Total: $ " . number_format((float)$aviso["precioTotal"], 2, ",", ".") .
+                                            ". Pagado: $ " . number_format((float)$aviso["pagado"], 2, ",", ".") .
+                                            ". Saldo pendiente: $ " . number_format($saldoAviso, 2, ",", ".") . ".";
+                                    ?>
+                                    <tr>
+                                        <td class="celda-pedido">#<?php echo str_pad((string)$aviso["idPedido"], 5, "0", STR_PAD_LEFT); ?></td>
+                                        <td><?php echo htmlspecialchars($aviso["cliente"]); ?></td>
+                                        <td>$ <?php echo number_format((float)$aviso["precioTotal"], 2, ",", "."); ?></td>
+                                        <td>
+                                            <div class="importe-pagado">
+                                                <strong>$ <?php echo number_format((float)$aviso["pagado"], 2, ",", "."); ?></strong>
+                                                <?php if ($saldoAviso > 0.009): ?>
+                                                    <button type="button" class="btn-editar-pago" aria-label="Completar el pago pendiente" aria-expanded="false">✎</button>
+                                                <?php else: ?>
+                                                    <span class="pago-completo" title="El pedido está completamente pagado">✓</span>
+                                                <?php endif; ?>
+                                            </div>
+                                            <?php if ($saldoAviso > 0.009): ?>
+                                                <form method="POST" class="form-pago" hidden>
+                                                    <input type="hidden" name="accion" value="actualizar_pagado">
+                                                    <input type="hidden" name="vista" value="notificar">
+                                                    <input type="hidden" name="idPedido" value="<?php echo (int)$aviso["idPedido"]; ?>">
+                                                    <label>Importe recibido ahora</label>
+                                                    <input
+                                                        type="number"
+                                                        name="nuevo_pago"
+                                                        min="0.01"
+                                                        max="<?php echo htmlspecialchars(number_format($saldoAviso, 2, ".", "")); ?>"
+                                                        step="0.01"
+                                                        value="<?php echo htmlspecialchars(number_format($saldoAviso, 2, ".", "")); ?>"
+                                                        required
+                                                    >
+                                                    <small>Saldo pendiente: $ <?php echo number_format($saldoAviso, 2, ",", "."); ?>. Ingresá cuánto recibiste en este cobro.</small>
+                                                    <select name="medio_pago_pago" required>
+                                                        <option value="">Medio de pago del saldo</option>
+                                                        <?php foreach ($mediosPago as $medio): ?>
+                                                            <option value="<?php echo (int)$medio["idMedioPago"]; ?>"><?php echo htmlspecialchars($medio["nombre"]); ?></option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                    <button type="submit" class="btn-guardar-pago">Guardar pago</button>
+                                                </form>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <form method="POST" class="form-estado-notificar">
+                                                <input type="hidden" name="accion" value="confirmar_entrega">
+                                                <input type="hidden" name="vista" value="notificar">
+                                                <input type="hidden" name="idPedido" value="<?php echo (int)$aviso["idPedido"]; ?>">
+                                                <select
+                                                    name="accion_visual"
+                                                    class="selector-estado estado-terminado"
+                                                    aria-label="Confirmar entrega del pedido"
+                                                    onchange="if (this.value === 'entregado') this.form.submit(); else this.value = 'terminado';"
+                                                >
+                                                    <option value="terminado" selected>Terminado</option>
+                                                    <option value="entregado" <?php echo $saldoAviso > 0.009 ? "disabled title=\"Completá el pago pendiente antes de entregar\"" : ""; ?>>Entregado</option>
+                                                </select>
+                                                <?php if ($saldoAviso > 0.009): ?>
+                                                    <small class="ayuda-entrega">Completar pago para entregar</small>
+                                                <?php endif; ?>
+                                            </form>
+                                        </td>
+                                        <td>
+                                            <?php if ($telefonoAviso !== "" && strlen($telefonoAviso) >= 11): ?>
+                                                <a class="btn-whatsapp" href="https://wa.me/<?php echo htmlspecialchars($telefonoAviso); ?>?text=<?php echo rawurlencode($mensajeWhatsapp); ?>" target="_blank" rel="noopener noreferrer">
+                                                    <span aria-hidden="true">☎</span> WhatsApp
+                                                </a>
+                                            <?php else: ?>
+                                                <span class="sin-telefono" title="Completá el teléfono del cliente con característica y número">Sin teléfono válido</span>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="nota-notificar">Esta pantalla muestra únicamente pedidos terminados. WhatsApp prepara un aviso para enviar manualmente. Al completar «Pagado», se registra solo el saldo cobrado; la entrega se confirma cuando el pedido está totalmente abonado.</p>
+                <?php endif; ?>
+            </section>
+
             <?php endif; ?>
 
         </main>
@@ -647,6 +938,16 @@ if ($vista === "pedidos") {
 </div>
 
 <script>
+    document.querySelectorAll(".btn-editar-pago").forEach(function(boton) {
+        boton.addEventListener("click", function() {
+            const formulario = boton.closest("td").querySelector(".form-pago");
+            const estaAbierto = !formulario.hidden;
+            formulario.hidden = estaAbierto;
+            boton.setAttribute("aria-expanded", String(!estaAbierto));
+            boton.textContent = estaAbierto ? "✎" : "×";
+        });
+    });
+
     document.querySelectorAll(".btn-detalles").forEach(function(boton) {
         boton.addEventListener("click", function() {
             const detalle = boton.closest(".tarjeta-pedido").querySelector(".detalle-expandido");
@@ -706,8 +1007,12 @@ if ($vista === "pedidos") {
     });
 
     const menuNuevoPedido = document.getElementById("menuNuevoPedido");
-    if (menuNuevoPedido) {
+    const formularioPedido = document.getElementById("pedidoForm");
+
+    if (menuNuevoPedido && formularioPedido) {
         menuNuevoPedido.addEventListener("click", function(evento) {
+            // Si ya estamos en Nuevo Pedido, vuelve al primer paso del formulario.
+            // Desde Pedidos o Notificar, se deja funcionar el enlace normal (?vista=nuevo).
             evento.preventDefault();
             mostrarPaso(1);
         });
