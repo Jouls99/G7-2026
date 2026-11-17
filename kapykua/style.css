@@ -756,3 +756,11 @@ textarea {
         font-size: 22px;
     }
 }
+
+/* Historial de pedidos: identidad visual de Kapykuá */
+.descripcion-historial { color:#806b72; margin:-8px 0 22px; }
+.tabla-historial th { white-space:nowrap; }
+.tabla-historial td { vertical-align:middle; }
+.tabla-historial .estado-entregado { background:#dcefe3; color:#286342; }
+.tabla-historial .estado-cancelado { background:#f8dddd; color:#8a3434; }
+#menuHistorial .icono { font-size:1.25rem; }

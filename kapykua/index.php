@@ -7,38 +7,17 @@ $tipoMensaje = "";
 if ($_SERVER["REQUEST_METHOD"] === "POST" && ($_POST["accion"] ?? "") === "actualizar_estado") {
     $idPedidoActualizar = (int)($_POST["idPedido"] ?? 0);
     $idEstadoNuevo = (int)($_POST["idEstado"] ?? 0);
-
-    if ($idPedidoActualizar <= 0 || $idEstadoNuevo <= 0 || ($_POST["vista"] ?? "") !== "pedidos") {
-        $mensaje = "No se pudo actualizar el estado: datos inválidos o acción fuera de la pantalla Pedidos.";
-        $tipoMensaje = "error";
+    $motivoCancelacion = trim($_POST["motivoCancelacion"] ?? "");
+    if ($idPedidoActualizar <= 0 || !in_array($idEstadoNuevo, [1, 2, 3, 4, 6], true) || ($_POST["vista"] ?? "") !== "pedidos") {
+        $mensaje = "No se pudo actualizar el estado: datos inválidos o acción fuera de la pantalla Pedidos."; $tipoMensaje = "error";
+    } elseif ($idEstadoNuevo === 6 && $motivoCancelacion === "") {
+        $mensaje = "Para cancelar un pedido, ingresá el motivo."; $tipoMensaje = "error";
     } else {
-        $stmt = $conn->prepare(
-            "SELECT idEstado FROM estadopedido WHERE idEstado = ? LIMIT 1"
-        );
-        $stmt->bind_param("i", $idEstadoNuevo);
-        $stmt->execute();
-        $estadoValido = $stmt->get_result()->fetch_assoc();
+        $stmt = $conn->prepare("UPDATE pedido SET idEstado = ?, motivoCancelacion = CASE WHEN ? = 6 THEN ? ELSE motivoCancelacion END WHERE idPedido = ?");
+        $stmt->bind_param("iisi", $idEstadoNuevo, $idEstadoNuevo, $motivoCancelacion, $idPedidoActualizar);
+        if ($stmt->execute()) { $mensaje = "Estado del pedido actualizado correctamente."; $tipoMensaje = "exito"; }
+        else { $mensaje = "No se pudo actualizar el estado del pedido: " . $stmt->error; $tipoMensaje = "error"; }
         $stmt->close();
-
-        if (!$estadoValido) {
-            $mensaje = "El estado seleccionado no existe.";
-            $tipoMensaje = "error";
-        } else {
-            $stmt = $conn->prepare(
-                "UPDATE pedido SET idEstado = ? WHERE idPedido = ?"
-            );
-            $stmt->bind_param("ii", $idEstadoNuevo, $idPedidoActualizar);
-            $stmt->execute();
-
-            if ($stmt->affected_rows >= 0 && $stmt->errno === 0) {
-                $mensaje = "Estado del pedido actualizado correctamente.";
-                $tipoMensaje = "exito";
-            } else {
-                $mensaje = "No se pudo actualizar el estado del pedido.";
-                $tipoMensaje = "error";
-            }
-            $stmt->close();
-        }
     }
 
 } elseif ($_SERVER["REQUEST_METHOD"] === "POST" && ($_POST["accion"] ?? "") === "actualizar_pagado") {
@@ -367,14 +346,14 @@ if ($resultadoMedios) {
 
 // Vista solicitada desde el menú.
 $vistaSolicitada = $_GET["vista"] ?? $_POST["vista"] ?? "nuevo";
-$vista = in_array($vistaSolicitada, ["nuevo", "pedidos", "notificar"], true)
+$vista = in_array($vistaSolicitada, ["nuevo", "pedidos", "notificar", "historial"], true)
     ? $vistaSolicitada
     : "nuevo";
 
 // Pedidos reales con cliente, estado y productos asociados.
 $pedidos = [];
 $estados = [];
-if (in_array($vista, ["pedidos", "notificar"], true)) {
+if (in_array($vista, ["pedidos", "notificar", "historial"], true)) {
     $resultadoEstados = $conn->query(
         "SELECT idEstado, descripcionEstado FROM estadopedido ORDER BY idEstado ASC"
     );
@@ -390,6 +369,7 @@ if (in_array($vista, ["pedidos", "notificar"], true)) {
             p.idEstado,
             p.fechaEntrega,
             p.precioTotal,
+            p.motivoCancelacion,
             c.nombre AS cliente,
             c.telefono,
             ep.descripcionEstado AS estado,
@@ -412,7 +392,14 @@ if (in_array($vista, ["pedidos", "notificar"], true)) {
         LEFT JOIN detallepedido dp ON dp.idPedido = p.idPedido
         LEFT JOIN producto pr ON pr.idProducto = dp.idProducto
         LEFT JOIN diseño d ON d.idDiseño = dp.idDiseño
-        GROUP BY p.idPedido, p.idEstado, p.fechaEntrega, p.precioTotal,
+        WHERE " . (
+            $vista === "historial"
+                ? "LOWER(ep.descripcionEstado) IN ('entregado','cancelado')"
+                : ($vista === "pedidos"
+                    ? "LOWER(ep.descripcionEstado) NOT IN ('terminado','entregado','cancelado')"
+                    : "1 = 0")
+        ) . "
+        GROUP BY p.idPedido, p.idEstado, p.fechaEntrega, p.precioTotal, p.motivoCancelacion,
                  c.nombre, c.telefono, ep.descripcionEstado
         ORDER BY p.idPedido DESC
     ";
@@ -485,6 +472,9 @@ if ($vista === "notificar") {
             <a href="?vista=notificar" class="menu-item <?php echo $vista === "notificar" ? "activo" : ""; ?>" id="menuNotificar">
                 <span class="icono">♧</span>
                 <span>Notificar</span>
+            </a>
+            <a href="?vista=historial" class="menu-item <?php echo $vista === "historial" ? "activo" : ""; ?>" id="menuHistorial">
+                <span class="icono">▤</span><span>Historial</span>
             </a>
         </nav>
     </aside>
@@ -737,12 +727,14 @@ if ($vista === "notificar") {
                                     <input type="hidden" name="vista" value="pedidos">
                                     <input type="hidden" name="idPedido" value="<?php echo (int)$pedido["idPedido"]; ?>">
                                     <label for="estado-<?php echo (int)$pedido["idPedido"]; ?>">Cambiar estado:</label>
+                                    <input type="hidden" name="motivoCancelacion" value="">
                                     <select
                                         id="estado-<?php echo (int)$pedido["idPedido"]; ?>"
                                         name="idEstado"
                                         aria-label="Nuevo estado del pedido"
                                     >
                                         <?php foreach ($estados as $estadoOpcion): ?>
+                                            <?php if ((int)$estadoOpcion["idEstado"] === 5) continue; ?>
                                             <option
                                                 value="<?php echo (int)$estadoOpcion["idEstado"]; ?>"
                                                 <?php echo (int)$estadoOpcion["idEstado"] === (int)$pedido["idEstado"] ? "selected" : ""; ?>
@@ -798,6 +790,53 @@ if ($vista === "notificar") {
                                 </div>
                             </article>
                         <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </section>
+
+            <?php elseif ($vista === "historial"): ?>
+
+            <section class="seguimiento historial">
+                <h1>Historial de Pedidos</h1>
+                <p class="descripcion-historial">En esta sección se conservan los pedidos entregados y cancelados. Podés consultar sus datos y, cuando corresponda, el motivo de cancelación.</p>
+
+                <?php if (count($pedidos) === 0): ?>
+                    <div class="sin-pedidos">
+                        <h2>No hay pedidos en el historial</h2>
+                        <p>Los pedidos aparecerán aquí cuando su estado sea «Entregado» o «Cancelado».</p>
+                    </div>
+                <?php else: ?>
+                    <div class="tabla-notificaciones-contenedor">
+                        <table class="tabla-notificaciones tabla-historial">
+                            <thead>
+                                <tr>
+                                    <th>Pedido</th>
+                                    <th>Cliente</th>
+                                    <th>Fecha de entrega</th>
+                                    <th>Total</th>
+                                    <th>Estado</th>
+                                    <th>Motivo de cancelación</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($pedidos as $pedidoHist): ?>
+                                    <?php
+                                        $estadoHist = $pedidoHist["estado"] ?: "Sin estado";
+                                        $claseHist = strtolower(trim($estadoHist));
+                                        $claseHist = strtr($claseHist, ["á"=>"a", "é"=>"e", "í"=>"i", "ó"=>"o", "ú"=>"u", "ñ"=>"n"]);
+                                        $claseHist = preg_replace('/[^a-z0-9]+/i', '-', $claseHist);
+                                    ?>
+                                    <tr>
+                                        <td class="celda-pedido">#PED-<?php echo str_pad((string)$pedidoHist["idPedido"], 5, "0", STR_PAD_LEFT); ?></td>
+                                        <td><?php echo htmlspecialchars($pedidoHist["cliente"]); ?></td>
+                                        <td><?php echo !empty($pedidoHist["fechaEntrega"]) ? date("d/m/Y", strtotime($pedidoHist["fechaEntrega"])) : "—"; ?></td>
+                                        <td>$ <?php echo number_format((float)$pedidoHist["precioTotal"], 2, ",", "."); ?></td>
+                                        <td><span class="estado estado-<?php echo htmlspecialchars($claseHist); ?>"><?php echo htmlspecialchars($estadoHist); ?></span></td>
+                                        <td><?php echo mb_strtolower($estadoHist, "UTF-8") === "cancelado" ? htmlspecialchars($pedidoHist["motivoCancelacion"] ?: "Sin motivo registrado") : "—"; ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
                     </div>
                 <?php endif; ?>
             </section>
@@ -938,6 +977,17 @@ if ($vista === "notificar") {
 </div>
 
 <script>
+document.querySelectorAll(".form-estado").forEach(function(form) {
+    form.addEventListener("submit", function(event) {
+        const estado = form.querySelector('select[name="idEstado"]');
+        const motivo = form.querySelector('input[name="motivoCancelacion"]');
+        if (estado && estado.value === "6") {
+            const razon = window.prompt("Indique brevemente el motivo de cancelación:");
+            if (razon === null || razon.trim() === "") { event.preventDefault(); if (razon !== null) alert("Debe ingresar un motivo para cancelar el pedido."); return; }
+            motivo.value = razon.trim();
+        }
+    });
+});
     document.querySelectorAll(".btn-editar-pago").forEach(function(boton) {
         boton.addEventListener("click", function() {
             const formulario = boton.closest("td").querySelector(".form-pago");
