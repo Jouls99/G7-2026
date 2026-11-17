@@ -1,0 +1,162 @@
+KAPYKUA - LIBRERIA GRAFICA INSTRUCCIONES PARA INSTALAR Y EJECUTAR EL
+SISTEMA =================================================
+
+1.  REQUISITOS
+
+-   Windows.
+-   XAMPP instalado.
+-   Apache y MySQL/MariaDB incluidos en XAMPP.
+-   Git instalado (solo si se desea descargar o actualizar el proyecto
+    desde GitHub).
+-   Navegador web.
+
+2.  DESCARGAR EL PROYECTO
+
+Opcion A: usando Git
+
+1.  Abrir PowerShell.
+
+2.  Ir a la carpeta donde se desea guardar el repositorio. Por ejemplo:
+
+    cd “$env:USERPROFILE”
+
+3.  Clonar el repositorio:
+
+    git clone https://github.com/Jouls99/G7-2026.git
+
+4.  El repositorio se descargara dentro de la carpeta G7-2026.
+
+Para actualizar una copia que ya existe:
+
+1.  Abrir PowerShell dentro de la carpeta G7-2026.
+
+2.  Ejecutar:
+
+    git pull origin main
+
+Opcion B: sin Git
+
+1.  Entrar al repositorio: https://github.com/Jouls99/G7-2026
+
+2.  Descargar el proyecto mediante Code > Download ZIP.
+
+3.  Extraer el ZIP.
+
+4.  COPIAR LA APLICACION A XAMPP
+
+5.  Dentro del repositorio, localizar la carpeta:
+
+    kapykua
+
+6.  Copiar esa carpeta dentro de:
+
+    C:
+
+7.  Comprobar que la ruta final sea:
+
+    C:
+
+La carpeta kapykua debe contener, como minimo:
+
+-   index.php
+-   conexion.php
+-   style.css
+
+IMPORTANTE: La aplicacion debe quedar directamente en htdocs. No colocar
+una carpeta G7-2026 completa dentro de htdocs esperando que la direccion
+/kapykua/ funcione.
+
+4.  INICIAR XAMPP
+
+5.  Abrir el Panel de Control de XAMPP.
+
+6.  Iniciar Apache.
+
+7.  Iniciar MySQL.
+
+8.  Comprobar que ambos servicios figuren como activos.
+
+Si MySQL no inicia, revisar los registros (Logs) de MySQL en XAMPP. No
+borrar ni reemplazar manualmente la carpeta mysql: podria provocar
+perdida de bases de datos.
+
+5.  CREAR E IMPORTAR LA BASE DE DATOS
+
+6.  Con Apache y MySQL activos, abrir:
+
+    http://localhost/phpmyadmin/
+
+7.  Ir a la opcion “Bases de datos”.
+
+8.  Crear una base de datos llamada exactamente:
+
+    sublimacionv3
+
+9.  Seleccionar la base de datos sublimacionv3 en el panel izquierdo.
+
+10. Entrar en la pestaña “Importar”.
+
+11. Seleccionar el archivo del repositorio:
+
+    database3.sql
+
+12. Ejecutar la importacion y esperar el mensaje de confirmacion.
+
+IMPORTANTE: La base debe llamarse sublimacionv3 porque ese es el nombre
+configurado en conexion.php. No importar el SQL sin seleccionar
+previamente la base de datos si phpMyAdmin solicita una base de destino.
+
+6.  VERIFICAR LA CONEXION
+
+Abrir el archivo:
+
+C:.php
+
+Verificar que la configuracion coincida con la instalacion local
+habitual de XAMPP:
+
+servidor: localhost usuario: root password: (vacio) base de datos:
+sublimacionv3
+
+La linea del nombre de la base debe ser:
+
+$baseDatos = “sublimacionv3”;
+
+Si la instalacion local de MySQL utiliza otra contraseña o usuario,
+actualizar esos datos en conexion.php.
+
+7.  ABRIR EL SISTEMA
+
+Con Apache y MySQL activos, abrir el navegador e ingresar a:
+
+http://localhost/kapykua/
+
+Si aparece un error de conexion, comprobar: - Que MySQL este iniciado en
+XAMPP. - Que la base sublimacionv3 exista en phpMyAdmin. - Que se haya
+importado correctamente database3.sql. - Que conexion.php tenga el
+nombre, usuario y contraseña correctos.
+
+8.  ESTRUCTURA DEL REPOSITORIO
+
+G7-2026/ | |– kapykua/ Aplicacion PHP |– database/ Archivo SQL oficial
+para instalar la base |– historico/ Archivos SQL de versiones anteriores
+|– Pantallas/ Material de diseño |– Pantallas_n2/ Material de diseño
+adicional |– changelog.txt Registro de cambios |– readme.txt Estas
+instrucciones
+
+La base vigente es database3.sql. Los archivos de historico son
+versiones anteriores y no deben importarse para una instalacion nueva.
+
+9.  RECOMENDACIONES
+
+-   No cambiar el nombre sublimacionv3 sin actualizar tambien
+    conexion.php.
+-   No reemplazar el SQL oficial por archivos antiguos de historico.
+-   Antes de actualizar el proyecto con Git, guardar o confirmar los
+    cambios locales.
+-   Si se modifica la estructura de la base de datos, exportar una nueva
+    copia SQL y mantener sincronizados el archivo oficial y el codigo.
+-   Para trabajar en otra computadora, repetir los pasos de instalacion
+    y utilizar una copia actualizada del repositorio.
+
+FIN DEL DOCUMENTO
