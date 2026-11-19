@@ -1,0 +1,2 @@
+kapykua/uploads/*
+!kapykua/uploads/.htaccess

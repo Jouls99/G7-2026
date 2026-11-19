@@ -764,3 +764,78 @@ textarea {
 .tabla-historial .estado-entregado { background:#dcefe3; color:#286342; }
 .tabla-historial .estado-cancelado { background:#f8dddd; color:#8a3434; }
 #menuHistorial .icono { font-size:1.25rem; }
+
+/* Kapykuá v6: acceso y menú de configuración */
+.auth-page{min-height:100vh;background:linear-gradient(180deg,#603b3d 0%,#8b5c5b 58%,#d8b4ad 100%);font-family:Georgia,'Times New Roman',serif;display:flex;flex-direction:column;align-items:center}
+.auth-banner{width:100%;padding:28px 16px;text-align:center;background:#87314f;color:#fff;font-family:monospace;font-size:clamp(30px,5vw,54px);letter-spacing:2px;border:1px solid rgba(255,255,255,.8);border-radius:0 0 20px 20px}
+.auth-card{width:min(980px,92vw);margin:40px auto 55px;background:#fff;border-radius:20px;padding:38px clamp(24px,7vw,110px);box-shadow:0 7px 12px #0003;color:#111}
+.auth-card h1{text-align:center;font-size:clamp(34px,5vw,58px);font-weight:900;font-style:italic;margin:0 0 34px}
+.auth-intro{text-align:center;font-size:19px;margin:-20px 0 26px}
+.auth-card label{display:block;font-size:clamp(18px,2.5vw,27px);margin:20px 0 8px}
+.auth-card input{width:100%;height:54px;border:3px solid #713b3b;border-radius:8px;padding:10px 14px;font:18px Georgia,serif;background:#fff}
+.auth-links{text-align:right;margin:10px 0 34px;font-size:20px}.auth-links a,.auth-card a{color:#171717;text-decoration:underline}
+.auth-submit{display:block;margin:0 auto;background:#b52f1e;color:white;border:4px solid #681c18;border-radius:30px;padding:13px 55px;font:bold 30px Georgia,serif;cursor:pointer;min-width:260px}
+.auth-submit:hover{filter:brightness(1.08)}.auth-error{background:#ffe7e7;color:#8d1717;padding:12px;border-radius:8px;text-align:center}
+.barra-superior{height:95px;min-height:95px;margin:3px 0 0;padding:0 24px;position:relative;display:flex;align-items:center;justify-content:space-between;gap:14px;background:var(--bordo);border:0;border-radius:9px 9px 0 0;z-index:20}
+.usuario-sesion{margin-right:auto;color:#fff;font-weight:700;font-size:15px;text-transform:uppercase;letter-spacing:.25px}
+.config-menu{position:relative;display:flex;align-items:center}.config-trigger{width:50px;height:50px;border:0;border-radius:50%;background:transparent;color:#fff;font-size:35px;line-height:1;cursor:pointer;box-shadow:none}.config-trigger:hover{background:rgba(255,255,255,.14)}
+.config-dropdown{display:none;position:absolute;right:0;top:55px;width:260px;background:#fff;border:1px solid #e4cbd4;border-radius:12px;box-shadow:0 8px 24px #0003;padding:10px;z-index:100}.config-dropdown.visible{display:block}
+.config-identidad{padding:10px 12px 13px;border-bottom:1px solid #eadde1;margin-bottom:5px;color:#713b50}.config-identidad strong,.config-identidad small{display:block}.config-identidad small{font-size:12px;color:#777;margin-top:3px}
+.config-dropdown a,.config-dropdown .config-logout{display:block;width:100%;padding:12px;text-decoration:none;color:#302329;border:0;border-radius:7px;background:white;text-align:left;font:15px Arial,sans-serif;cursor:pointer}.config-dropdown a:hover,.config-dropdown .config-logout:hover{background:#f7edf1}.config-dropdown .config-logout{color:#9f281e;border-top:1px solid #eee;border-radius:0;margin-top:4px}
+.admin-page,.account-page{padding:30px;min-height:100vh;background:#f7eef1}.admin-panel,.account-panel{max-width:1100px;margin:0 auto;background:#fff;border-radius:18px;padding:28px;box-shadow:0 5px 18px #00000012}.admin-panel h1,.account-panel h1{color:#87314f;margin-bottom:18px}.admin-table{width:100%;border-collapse:collapse;margin-top:18px}.admin-table th{background:#87314f;color:#fff;text-align:left}.admin-table th,.admin-table td{padding:13px 11px;border-bottom:1px solid #eadde1}.admin-table tr:nth-child(even){background:#fcf7f9}.admin-table form{display:inline-flex;gap:6px;align-items:center;margin:3px}.admin-panel button,.account-panel button{background:#87314f;color:white;border:0;border-radius:7px;padding:9px 13px;cursor:pointer}.admin-panel select,.account-panel input{padding:9px;border:1px solid #cdaeb9;border-radius:7px}.admin-actions{margin-top:22px}.admin-actions a{color:#87314f;font-weight:bold}
+@media(max-width:650px){.auth-card{margin:24px auto;padding:28px 22px}.auth-submit{min-width:0;width:100%}.admin-page,.account-page{padding:12px}.admin-panel,.account-panel{padding:16px;overflow-x:auto}.admin-table{min-width:700px}}
+.admin-create{display:grid;grid-template-columns:repeat(2,minmax(180px,1fr));gap:14px;margin:16px 0 28px;padding:18px;background:#fbf5f7;border:1px solid #eadde1;border-radius:12px}.admin-create label{display:flex;flex-direction:column;gap:6px;font-weight:600;color:#713b50}.admin-create input{padding:10px;border:1px solid #cdaeb9;border-radius:7px}.admin-create button{align-self:end;background:#87314f;color:white;border:0;border-radius:7px;padding:11px;cursor:pointer}.admin-table-wrap{overflow-x:auto}.admin-table details{margin-top:5px}.admin-table details form{margin-top:8px}.account-panel{max-width:600px}.account-panel form{display:grid;gap:10px}.account-panel label{display:grid;gap:6px;color:#713b50;font-weight:600}
+@media(max-width:650px){.admin-create{grid-template-columns:1fr}}
+
+/* Kapykuá v7: detalles múltiples por pedido, respetando la identidad visual */
+.detalle-producto{background:#fff9fb;border:1px solid #e6cbd4;border-left:5px solid #87314f;border-radius:12px;padding:18px;margin:14px 0 18px;box-shadow:0 3px 10px #542b3510}
+.detalle-producto-encabezado{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.detalle-producto-encabezado h3{margin:0;color:#87314f;font-family:Georgia,serif;font-size:20px}
+.detalle-producto .campo{margin:12px 0}
+.detalle-producto small{display:block;color:#806b72;margin-top:6px;font-size:12px}
+.btn-agregar-detalle{display:block;width:100%;margin:12px 0 18px;padding:12px 16px;background:#fff;color:#87314f;border:2px dashed #b77d91;border-radius:10px;font-weight:700;font-size:15px;cursor:pointer}
+.btn-agregar-detalle:hover{background:#fbf0f4}
+.btn-quitar-detalle{display:block;margin:10px 0 0 auto;padding:8px 13px;background:#fff;color:#963d48;border:1px solid #d8aeb7;border-radius:7px;cursor:pointer}
+.btn-quitar-detalle:disabled{opacity:.45;cursor:not-allowed}
+#totalPedidoVisual{color:#87314f}
+@media(max-width:650px){.detalle-producto{padding:13px}.detalle-producto .fila{display:block}}
+
+/* Archivos vinculados a cada detalle del pedido */
+.archivos-detalle {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    margin-top: 8px;
+    padding: 10px 12px;
+    background: #fff8fa;
+    border: 1px solid #ead3da;
+    border-radius: 8px;
+}
+.archivo-adjunto {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 6px 0;
+    border-top: 1px solid #f0e3e7;
+}
+.archivo-adjunto span { flex: 1 1 180px; overflow-wrap: anywhere; }
+.archivo-adjunto small { color: #777; }
+.archivo-adjunto a, .archivos-detalle a { color: #9f2946; font-weight: 600; text-decoration: none; }
+.archivo-adjunto a:hover, .archivos-detalle a:hover { text-decoration: underline; }
+
+
+/* Kapykuá v9: iconos laterales blancos con relieve sutil */
+.menu-item .icono-svg { display:flex; align-items:center; justify-content:center; }
+.menu-item .icono-svg svg { width:30px; height:30px; overflow:visible; fill:none; stroke:#fff; stroke-width:2.15; stroke-linecap:round; stroke-linejoin:round; filter:drop-shadow(1px 2px 1px rgba(0,0,0,.48)) drop-shadow(-.5px -0.5px .5px rgba(255,255,255,.35)); }
+
+/* Kapykuá v9: consulta de detalles desde el historial */
+.btn-detalles-historial { padding:8px 12px; border:0; border-radius:6px; background:#b52f1e; color:#fff; font-weight:700; cursor:pointer; white-space:nowrap; }
+.btn-detalles-historial:hover { filter:brightness(1.08); }
+.fila-detalles-historial > td { padding:14px !important; background:#fff9fb; }
+.detalle-historial-expandido { padding:8px 10px; color:#171717; }
+.detalle-historial-expandido > p { margin:6px 0; }
+.detalle-historial-expandido > strong { display:block; margin:12px 0 6px; color:#87314f; }
+.detalle-historial-expandido .linea-detalle { margin:10px 0; padding:12px; background:#fff; border:1px solid #ead3dc; border-left:4px solid #87314f; border-radius:8px; }
+.tabla-historial th:last-child,.tabla-historial td:last-child { white-space:nowrap; }
+@media(max-width:850px){ .tabla-historial { min-width:900px; } }

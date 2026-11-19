@@ -1,5 +1,21 @@
 <?php
+session_start();
 require_once "conexion.php";
+if (empty($_SESSION["idUsuario"])) {
+    $errorLogin = "";
+    if ($_SERVER["REQUEST_METHOD"] === "POST" && ($_POST["accion"] ?? "") === "login") {
+        $email = trim($_POST["email"] ?? ""); $clave = $_POST["clave"] ?? "";
+        $st = $conn->prepare("SELECT idUsuario,nombre,email,passwordHash,rol,estado FROM usuario WHERE email=? LIMIT 1");
+        $st->bind_param("s", $email); $st->execute(); $u = $st->get_result()->fetch_assoc(); $st->close();
+        if ($u && (int)$u["estado"] === 1 && password_verify($clave, $u["passwordHash"])) {
+            session_regenerate_id(true); $_SESSION["idUsuario"]=(int)$u["idUsuario"]; $_SESSION["nombre"]=$u["nombre"]; $_SESSION["rol"]=$u["rol"];
+            header("Location: index.php"); exit;
+        } else { $errorLogin = "Correo o contraseña incorrectos, o cuenta inactiva."; }
+    }
+    ?><!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Acceso a la Cuenta - Kapykuá</title><link rel="stylesheet" href="style.css"></head><body class="auth-page"><header class="auth-banner">Acceso a la Cuenta</header><form class="auth-card" method="post"><h1>Iniciar Sesión</h1><p class="auth-intro">Ingresá tus datos para continuar</p><?php if($errorLogin): ?><p class="auth-error"><?php echo htmlspecialchars($errorLogin); ?></p><?php endif; ?><input type="hidden" name="accion" value="login"><label>Correo Electrónico de Usuario</label><input type="email" name="email" required autocomplete="username"><label>Contraseña:</label><input type="password" name="clave" required autocomplete="current-password"><div class="auth-links"><a href="recuperar.php">¿Olvidaste tu contraseña?</a></div><button class="auth-submit">Ingresar</button></form></body></html><?php exit;
+}
+if ($_SERVER["REQUEST_METHOD"] === "POST" && ($_POST["accion"] ?? "") === "logout") { $_SESSION=[]; session_destroy(); header("Location: index.php"); exit; }
+
 
 $mensaje = "";
 $tipoMensaje = "";
@@ -157,157 +173,111 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && ($_POST["accion"] ?? "") === "actua
 
     $nombre = trim($_POST["nombre"] ?? "");
     $telefono = trim($_POST["telefono"] ?? "");
-    $productoId = (int)($_POST["producto"] ?? 0);
-    $cantidad = (int)($_POST["cantidad"] ?? 0);
-    $disenoDescripcion = trim($_POST["diseno"] ?? "");
+    $productosPedido = $_POST["producto"] ?? [];
+    $cantidadesPedido = $_POST["cantidad"] ?? [];
+    $preciosAcordados = $_POST["precio_acordado"] ?? [];
+    $disenosPedido = $_POST["diseno"] ?? [];
+    $observacionesPedido = $_POST["observaciones"] ?? [];
     $fechaEntrega = $_POST["fecha_entrega"] ?? "";
-    $precioUnitario = (float)($_POST["precio_unitario"] ?? 0);
     $montoPago = (float)($_POST["monto"] ?? 0);
     $medioPagoId = (int)($_POST["medio_pago"] ?? 0);
 
-    if (
-        $nombre === "" ||
-        $productoId <= 0 ||
-        $cantidad <= 0 ||
-        $fechaEntrega === "" ||
-        $precioUnitario < 0 ||
-        $montoPago <= 0 ||
-        $medioPagoId <= 0
-    ) {
-        $mensaje = "Completá todos los campos obligatorios antes de registrar el pedido.";
+    $detalles = [];
+    foreach ($productosPedido as $i => $productoValor) {
+        $productoId = (int)$productoValor;
+        $cantidad = (int)($cantidadesPedido[$i] ?? 0);
+        $precioAcordado = round((float)($preciosAcordados[$i] ?? 0), 2);
+        $diseno = trim($disenosPedido[$i] ?? "");
+        $observaciones = trim($observacionesPedido[$i] ?? "");
+        if ($productoId > 0 && $cantidad > 0 && $precioAcordado >= 0) {
+            $detalles[] = ["producto"=>$productoId, "cantidad"=>$cantidad, "precio"=>$precioAcordado, "diseno"=>$diseno, "observaciones"=>$observaciones, "indice"=>$i];
+        }
+    }
+    $precioTotal = round(array_sum(array_column($detalles, "precio")), 2);
+
+    if ($nombre === "" || count($detalles) === 0 || $fechaEntrega === "" || $montoPago <= 0 || $medioPagoId <= 0) {
+        $mensaje = "Completá los datos del cliente, al menos un producto, la fecha y el pago inicial.";
+        $tipoMensaje = "error";
+    } elseif ($montoPago > $precioTotal) {
+        $mensaje = "La seña no puede ser mayor que el precio total del pedido.";
         $tipoMensaje = "error";
     } else {
-
         $conn->begin_transaction();
-
         try {
-            // 1. Cliente
-            $stmt = $conn->prepare(
-                "INSERT INTO cliente (nombre, telefono) VALUES (?, ?)"
-            );
-            $stmt->bind_param("ss", $nombre, $telefono);
-            $stmt->execute();
-            $idCliente = $conn->insert_id;
-            $stmt->close();
+            $stmt = $conn->prepare("INSERT INTO cliente (nombre, telefono) VALUES (?, ?)");
+            $stmt->bind_param("ss", $nombre, $telefono); $stmt->execute();
+            $idCliente = $conn->insert_id; $stmt->close();
 
-            // 2. Estado inicial: Pendiente
-            $stmt = $conn->prepare(
-                "SELECT idEstado FROM estadopedido
-                 WHERE descripcionEstado = 'Pendiente' LIMIT 1"
-            );
-            $stmt->execute();
-            $resultadoEstado = $stmt->get_result();
-            $estado = $resultadoEstado->fetch_assoc();
-            $stmt->close();
-
-            if (!$estado) {
-                throw new Exception("No existe el estado inicial 'Pendiente' en la base de datos.");
-            }
+            $stmt = $conn->prepare("SELECT idEstado FROM estadopedido WHERE descripcionEstado = 'Pendiente' LIMIT 1");
+            $stmt->execute(); $estado = $stmt->get_result()->fetch_assoc(); $stmt->close();
+            if (!$estado) throw new Exception("No existe el estado inicial 'Pendiente' en la base de datos.");
 
             $idEstado = (int)$estado["idEstado"];
+            $idUsuario = (int)$_SESSION["idUsuario"];
+            $stmt = $conn->prepare("INSERT INTO pedido (fechaEntrega, precioTotal, idCliente, idEstado, idUsuario) VALUES (?, ?, ?, ?, ?)");
+            $stmt->bind_param("sdiii", $fechaEntrega, $precioTotal, $idCliente, $idEstado, $idUsuario);
+            $stmt->execute(); $idPedido = $conn->insert_id; $stmt->close();
 
-            // 3. Usuario que registra el pedido.
-            // Esta version todavía no tiene login: usamos el primer usuario activo. 
-            $stmt = $conn->prepare(
-                "SELECT idUsuario FROM usuario
-                 WHERE estado = 1
-                 ORDER BY idUsuario ASC LIMIT 1"
-            );
-            $stmt->execute();
-            $resultadoUsuario = $stmt->get_result();
-            $usuario = $resultadoUsuario->fetch_assoc();
-            $stmt->close();
+            foreach ($detalles as $detalle) {
+                $idDiseno = null;
+                $descripcionCompleta = $detalle["diseno"];
+                if ($detalle["observaciones"] !== "") {
+                    $descripcionCompleta .= ($descripcionCompleta !== "" ? "\n\n" : "") . "Observaciones: " . $detalle["observaciones"];
+                }
+                $indice = $detalle["indice"];
+                // La descripción queda asociada al diseño del detalle; los archivos se registran
+                // independientemente en archivopedido para permitir múltiples adjuntos.
+                if ($descripcionCompleta !== "") {
+                    $nombreDiseno = "Diseño personalizado";
+                    $archivoRelativo = null;
+                    $stmt = $conn->prepare("INSERT INTO diseño (nombre, descripcion, archivo) VALUES (?, ?, ?)");
+                    $stmt->bind_param("sss", $nombreDiseno, $descripcionCompleta, $archivoRelativo);
+                    $stmt->execute(); $idDiseno = $conn->insert_id; $stmt->close();
+                }
+                // precioUnitario conserva su significado histórico: total del detalle / cantidad.
+                $precioUnitarioBD = $detalle["precio"] / $detalle["cantidad"];
+                if ($idDiseno === null) {
+                    $stmt = $conn->prepare("INSERT INTO detallepedido (cantidad, precioUnitario, idPedido, idProducto, idDiseño) VALUES (?, ?, ?, ?, NULL)");
+                    $stmt->bind_param("idii", $detalle["cantidad"], $precioUnitarioBD, $idPedido, $detalle["producto"]);
+                } else {
+                    $stmt = $conn->prepare("INSERT INTO detallepedido (cantidad, precioUnitario, idPedido, idProducto, idDiseño) VALUES (?, ?, ?, ?, ?)");
+                    $stmt->bind_param("idiii", $detalle["cantidad"], $precioUnitarioBD, $idPedido, $detalle["producto"], $idDiseno);
+                }
+                $stmt->execute(); $idDetalle = $conn->insert_id; $stmt->close();
 
-            if (!$usuario) {
-                throw new Exception("No existe un usuario activo para registrar el pedido.");
+                // Admite varios archivos por cada detalle. Los nombres físicos son aleatorios.
+                if (isset($_FILES["archivos"]["name"][$indice]) && is_array($_FILES["archivos"]["name"][$indice])) {
+                    $directorio = __DIR__ . "/uploads/disenos/PED-" . $idPedido . "/detalle-" . $idDetalle;
+                    foreach ($_FILES["archivos"]["name"][$indice] as $j => $nombreOriginal) {
+                        $errorArchivo = $_FILES["archivos"]["error"][$indice][$j] ?? UPLOAD_ERR_NO_FILE;
+                        if ($errorArchivo === UPLOAD_ERR_NO_FILE) continue;
+                        if ($errorArchivo !== UPLOAD_ERR_OK) throw new Exception("No se pudo cargar uno de los archivos adjuntos.");
+                        $tmp = $_FILES["archivos"]["tmp_name"][$indice][$j];
+                        $tam = (int)$_FILES["archivos"]["size"][$indice][$j];
+                        $ext = strtolower(pathinfo($nombreOriginal, PATHINFO_EXTENSION));
+                        $permitidas = ["jpg", "jpeg", "png", "webp", "pdf"];
+                        if (!in_array($ext, $permitidas, true) || $tam <= 0 || $tam > 8 * 1024 * 1024) throw new Exception("Cada archivo debe ser JPG, PNG, WEBP o PDF y no superar 8 MB.");
+                        $mime = (new finfo(FILEINFO_MIME_TYPE))->file($tmp);
+                        $mimes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+                        if (!in_array($mime, $mimes, true)) throw new Exception("El tipo real de uno de los archivos no es válido.");
+                        if (!is_dir($directorio) && !mkdir($directorio, 0755, true)) throw new Exception("No se pudo preparar la carpeta de archivos.");
+                        $nombreAlmacenado = bin2hex(random_bytes(16)) . "." . $ext;
+                        $rutaFisica = $directorio . "/" . $nombreAlmacenado;
+                        if (!move_uploaded_file($tmp, $rutaFisica)) throw new Exception("No se pudo guardar uno de los archivos.");
+                        $rutaRelativa = "uploads/disenos/PED-" . $idPedido . "/detalle-" . $idDetalle . "/" . $nombreAlmacenado;
+                        $idUsuarioCarga = (int)$_SESSION["idUsuario"];
+                        $stmtArchivo = $conn->prepare("INSERT INTO archivopedido (idDetalle, nombreOriginal, nombreAlmacenado, ruta, tipoMime, tamano, idUsuario) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                        $stmtArchivo->bind_param("issssii", $idDetalle, $nombreOriginal, $nombreAlmacenado, $rutaRelativa, $mime, $tam, $idUsuarioCarga);
+                        $stmtArchivo->execute(); $stmtArchivo->close();
+                    }
+                }
             }
 
-            $idUsuario = (int)$usuario["idUsuario"];
-
-            // 4. Pedido
-            $precioTotal = $precioUnitario * $cantidad;
-
-            $stmt = $conn->prepare(
-                "INSERT INTO pedido
-                (fechaEntrega, precioTotal, idCliente, idEstado, idUsuario)
-                VALUES (?, ?, ?, ?, ?)"
-            );
-            $stmt->bind_param(
-                "sdiii",
-                $fechaEntrega,
-                $precioTotal,
-                $idCliente,
-                $idEstado,
-                $idUsuario
-            );
-            $stmt->execute();
-            $idPedido = $conn->insert_id;
-            $stmt->close();
-
-            // 5. Diseño opcional según el nuevo modelo (Esto hay que probarlo).
-            $idDiseno = null;
-
-            if ($disenoDescripcion !== "") {
-                $disenoNombre = "Diseño personalizado";
-                $stmt = $conn->prepare(
-                    "INSERT INTO diseño (nombre, descripcion, archivo)
-                     VALUES (?, ?, NULL)"
-                );
-                $stmt->bind_param("ss", $disenoNombre, $disenoDescripcion);
-                $stmt->execute();
-                $idDiseno = $conn->insert_id;
-                $stmt->close();
-            }
-
-            // 6. Detalle del pedido
-            if ($idDiseno === null) {
-                $stmt = $conn->prepare(
-                    "INSERT INTO detallepedido
-                    (cantidad, precioUnitario, idPedido, idProducto, idDiseño)
-                    VALUES (?, ?, ?, ?, NULL)"
-                );
-                $stmt->bind_param(
-                    "idii",
-                    $cantidad,
-                    $precioUnitario,
-                    $idPedido,
-                    $productoId
-                );
-            } else {
-                $stmt = $conn->prepare(
-                    "INSERT INTO detallepedido
-                    (cantidad, precioUnitario, idPedido, idProducto, idDiseño)
-                    VALUES (?, ?, ?, ?, ?)"
-                );
-                $stmt->bind_param(
-                    "idiii",
-                    $cantidad,
-                    $precioUnitario,
-                    $idPedido,
-                    $productoId,
-                    $idDiseno
-                );
-            }
-            $stmt->execute();
-            $stmt->close();
-
-            // 7. Pago / seña inicial.
-            // fechaHoraPago usa el valor DEFAULT CURRENT_TIMESTAMP de la BD.
-            // El comprobante queda NULL hasta una futura version
-            $stmt = $conn->prepare(
-                "INSERT INTO pago
-                (monto, idPedido, idMedioPago)
-                VALUES (?, ?, ?)"
-            );
-            $stmt->bind_param("dii", $montoPago, $idPedido, $medioPagoId);
-            $stmt->execute();
-            $stmt->close();
-
+            $stmt = $conn->prepare("INSERT INTO pago (monto, idPedido, idMedioPago) VALUES (?, ?, ?)");
+            $stmt->bind_param("dii", $montoPago, $idPedido, $medioPagoId); $stmt->execute(); $stmt->close();
             $conn->commit();
-
             $mensaje = "Pedido registrado correctamente. ID del pedido: #" . $idPedido;
             $tipoMensaje = "exito";
-
         } catch (Exception $e) {
             $conn->rollback();
             $mensaje = "No se pudo registrar el pedido: " . $e->getMessage();
@@ -379,10 +349,13 @@ if (in_array($vista, ["pedidos", "notificar", "historial"], true)) {
             ) AS productos,
             GROUP_CONCAT(
                 CONCAT(
+                    dp.idDetalle, '||',
+                    COALESCE(dp.idDiseño, 0), '||',
                     pr.nombre, '||',
                     dp.cantidad, '||',
                     dp.precioUnitario, '||',
-                    COALESCE(d.descripcion, '')
+                    COALESCE(d.descripcion, ''), '||',
+                    COALESCE(d.archivo, '')
                 )
                 ORDER BY pr.nombre SEPARATOR '##'
             ) AS detalle_productos
@@ -409,6 +382,15 @@ if (in_array($vista, ["pedidos", "notificar", "historial"], true)) {
             $pedidos[] = $pedido;
         }
     }
+}
+
+// Archivos asociados a los detalles de los pedidos visibles (Pedidos e Historial).
+$archivosPorDetalle = [];
+if (count($pedidos) > 0) {
+    $idsPedidosVisibles = array_values(array_unique(array_map(static fn($p) => (int)$p["idPedido"], $pedidos)));
+    $idsSql = implode(",", $idsPedidosVisibles);
+    $resArchivos = $conn->query("SELECT ap.idArchivo, ap.idDetalle, ap.nombreOriginal, ap.tipoMime, ap.tamano FROM archivopedido ap INNER JOIN detallepedido dp ON dp.idDetalle = ap.idDetalle WHERE dp.idPedido IN ($idsSql) ORDER BY ap.fechaCarga ASC, ap.idArchivo ASC");
+    if ($resArchivos) while ($a = $resArchivos->fetch_assoc()) $archivosPorDetalle[(int)$a["idDetalle"]][] = $a;
 }
 
 // Datos reales para la pantalla Notificar: total y suma de pagos registrados.
@@ -465,12 +447,12 @@ if ($vista === "notificar") {
             </a>
 
             <a href="?vista=pedidos" class="menu-item <?php echo $vista === "pedidos" ? "activo" : ""; ?>" id="menuPedidos">
-                <span class="icono">□</span>
+                <span class="icono icono-svg" aria-hidden="true"><svg viewBox="0 0 32 32" focusable="false"><path d="M3.5 9.5a2 2 0 0 1 2-2h8l3 3h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-21a2 2 0 0 1-2-2z"/><path d="M3.8 12h24"/></svg></span>
                 <span>Pedidos</span>
             </a>
 
             <a href="?vista=notificar" class="menu-item <?php echo $vista === "notificar" ? "activo" : ""; ?>" id="menuNotificar">
-                <span class="icono">♧</span>
+                <span class="icono icono-svg" aria-hidden="true"><svg viewBox="0 0 32 32" focusable="false"><path d="M7 22.5c1.8-2 2.5-4.3 2.5-9a6.5 6.5 0 0 1 13 0c0 4.7.7 7 2.5 9z"/><path d="M5 22.5h22M13 26a3 3 0 0 0 6 0"/></svg></span>
                 <span>Notificar</span>
             </a>
             <a href="?vista=historial" class="menu-item <?php echo $vista === "historial" ? "activo" : ""; ?>" id="menuHistorial">
@@ -482,8 +464,18 @@ if ($vista === "notificar") {
     <div class="principal">
 
         <header class="barra-superior">
-            <span class="ajustes">⚙</span>
+            <span class="usuario-sesion">USUARIO: <?php echo htmlspecialchars($_SESSION["nombre"]); ?></span>
+            <div class="config-menu">
+                <button type="button" class="config-trigger" id="configTrigger" aria-label="Abrir configuración" aria-expanded="false" title="Configuración">⚙</button>
+                <div class="config-dropdown" id="configDropdown">
+                    <div class="config-identidad"><strong><?php echo htmlspecialchars($_SESSION["nombre"]); ?></strong><small><?php echo htmlspecialchars($_SESSION["rol"]); ?></small></div>
+                    <a href="cuenta.php">Cambiar contraseña</a>
+                    <?php if (($_SESSION["rol"] ?? "") === "ADMIN"): ?><a href="usuarios.php">Administración de usuarios</a><?php endif; ?>
+                    <form method="post"><input type="hidden" name="accion" value="logout"><button type="submit" class="config-logout">Cerrar sesión</button></form>
+                </div>
+            </div>
         </header>
+        <script>document.addEventListener('DOMContentLoaded',function(){const b=document.getElementById('configTrigger'),m=document.getElementById('configDropdown');b.addEventListener('click',function(e){e.stopPropagation();const open=m.classList.toggle('visible');b.setAttribute('aria-expanded',open?'true':'false');});document.addEventListener('click',function(e){if(!m.contains(e.target)&&!b.contains(e.target)){m.classList.remove('visible');b.setAttribute('aria-expanded','false');}});});</script>
 
         <main class="contenido">
 
@@ -494,7 +486,7 @@ if ($vista === "notificar") {
             <?php endif; ?>
 
             <?php if ($vista === "nuevo"): ?>
-            <form method="POST" id="pedidoForm">
+            <form method="POST" id="pedidoForm" enctype="multipart/form-data">
 
                 <div class="pasos">
 
@@ -535,61 +527,29 @@ if ($vista === "notificar") {
 
                         <div class="contenido-oculto">
 
-                            <div class="campo">
-                                <label for="producto">Producto *</label>
-                                <select id="producto" name="producto" required>
-                                    <option value="">Seleccione un producto</option>
-
-                                    <?php foreach ($productos as $producto): ?>
-                                        <option
-                                            value="<?php echo (int)$producto["idProducto"]; ?>"
-                                            data-precio="<?php echo htmlspecialchars($producto["precio"] ?? ""); ?>"
-                                        >
-                                            <?php echo htmlspecialchars($producto["nombre"]); ?>
-                                            <?php if (!empty($producto["descripcion"])): ?>
-                                                - <?php echo htmlspecialchars($producto["descripcion"]); ?>
-                                            <?php endif; ?>
-                                        </option>
-                                    <?php endforeach; ?>
-
-                                </select>
-                            </div>
-
-                            <div class="fila">
-                                <div class="campo">
-                                    <label for="cantidad">Cantidad *</label>
-                                    <input
-                                        type="number"
-                                        id="cantidad"
-                                        name="cantidad"
-                                        min="1"
-                                        value="1"
-                                        required
-                                    >
-                                </div>
-
-                                <div class="campo">
-                                    <label for="precio_unitario">Precio unitario *</label>
-                                    <input
-                                        type="number"
-                                        id="precio_unitario"
-                                        name="precio_unitario"
-                                        min="0"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        required
-                                    >
+                            <div id="listaDetallesPedido">
+                                <div class="detalle-producto campo-detalle" data-detalle>
+                                    <div class="detalle-producto-encabezado"><h3>Producto 1</h3></div>
+                                    <div class="campo">
+                                        <label>Producto *</label>
+                                        <select name="producto[]" required>
+                                            <option value="">Seleccione un producto</option>
+                                            <?php foreach ($productos as $producto): ?>
+                                                <option value="<?php echo (int)$producto["idProducto"]; ?>"><?php echo htmlspecialchars($producto["nombre"] . (!empty($producto["descripcion"]) ? " - " . $producto["descripcion"] : "")); ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="fila">
+                                        <div class="campo"><label>Cantidad *</label><input type="number" name="cantidad[]" min="1" value="1" required></div>
+                                        <div class="campo"><label>Precio acordado por este detalle *</label><input type="number" name="precio_acordado[]" min="0" step="0.01" placeholder="0.00" required></div>
+                                    </div>
+                                    <div class="campo"><label>Descripción e indicaciones</label><textarea name="diseno[]" rows="3" maxlength="1000" placeholder="Describí el diseño solicitado y cualquier indicación importante para este producto..."></textarea></div>
+                                    <div class="campo"><label>Archivos del diseño (opcional)</label><input type="file" name="archivos[0][]" multiple accept=".jpg,.jpeg,.png,.webp,.pdf"><small>Podés adjuntar varios JPG, PNG, WEBP o PDF. Máximo 8 MB por archivo.</small></div>
+                                    <button type="button" class="btn-quitar-detalle" data-eliminar-detalle disabled>Eliminar producto</button>
                                 </div>
                             </div>
-
-                            <div class="campo">
-                                <label for="diseno">Diseño solicitado</label>
-                                <textarea id="diseno" name="diseno" rows="4" maxlength="150" placeholder="Describí el diseño que solicita el cliente..."></textarea>
-                            </div>
-
-                            <div class="nota-beta">
-                                La funcion para subir el archivo del diseño y observaciones especiales lo tengo que implementar.
-                            </div>
+                            <button type="button" class="btn-agregar-detalle" id="agregarDetalle">+ Agregar nuevo producto</button>
+                            <div class="resumen"><div><span>Total de productos</span><strong id="totalPedidoVisual">$ 0,00</strong></div></div>
 
                             <div class="botonera">
                                 <button type="button" class="btn-atras" data-anterior="1">
@@ -777,13 +737,21 @@ if ($vista === "notificar") {
                                     <p><strong>Total:</strong> $ <?php echo number_format((float)$pedido["precioTotal"], 2, ",", "."); ?></p>
                                     <strong>Detalle:</strong>
                                     <?php foreach ($detallesLista as $detalleTexto): ?>
-                                        <?php $partes = explode("||", $detalleTexto, 4); ?>
+                                        <?php $partes = explode("||", $detalleTexto, 7); $idDetalleVista = (int)($partes[0] ?? 0); $archivoLegacy = $partes[6] ?? ""; ?>
                                         <div class="linea-detalle">
-                                            <strong><?php echo htmlspecialchars($partes[0] ?? "Producto"); ?></strong>
-                                            <span>Cantidad: <?php echo htmlspecialchars($partes[1] ?? "0"); ?></span>
-                                            <span>Precio unitario: $ <?php echo number_format((float)($partes[2] ?? 0), 2, ",", "."); ?></span>
-                                            <?php if (!empty($partes[3])): ?>
-                                                <span>Diseño: <?php echo htmlspecialchars($partes[3]); ?></span>
+                                            <strong><?php echo htmlspecialchars($partes[2] ?? "Producto"); ?></strong>
+                                            <span>Cantidad: <?php echo htmlspecialchars($partes[3] ?? "0"); ?></span>
+                                            <span>Precio acordado del detalle: $ <?php echo number_format((float)($partes[4] ?? 0) * (int)($partes[3] ?? 0), 2, ",", "."); ?></span>
+                                            <?php if (!empty($partes[5])): ?><span>Descripción: <?php echo nl2br(htmlspecialchars($partes[5])); ?></span><?php endif; ?>
+                                            <?php if ($archivoLegacy !== ""): ?>
+                                                <div class="archivos-detalle"><strong>Archivo anterior:</strong> <a href="archivo_legacy.php?idDiseno=<?php echo (int)($partes[1] ?? 0); ?>">Descargar archivo</a></div>
+                                            <?php endif; ?>
+                                            <?php if (!empty($archivosPorDetalle[$idDetalleVista])): ?>
+                                                <div class="archivos-detalle"><strong>Archivos adjuntos:</strong>
+                                                    <?php foreach ($archivosPorDetalle[$idDetalleVista] as $archivoVista): ?>
+                                                        <div class="archivo-adjunto"><span><?php echo htmlspecialchars($archivoVista["nombreOriginal"]); ?></span><small><?php echo number_format((int)$archivoVista["tamano"] / 1024, 1, ",", "."); ?> KB</small><a href="archivo_pedido.php?id=<?php echo (int)$archivoVista["idArchivo"]; ?>&ver=1" target="_blank" rel="noopener">Ver</a><a href="archivo_pedido.php?id=<?php echo (int)$archivoVista["idArchivo"]; ?>">Descargar</a></div>
+                                                    <?php endforeach; ?>
+                                                </div>
                                             <?php endif; ?>
                                         </div>
                                     <?php endforeach; ?>
@@ -816,6 +784,7 @@ if ($vista === "notificar") {
                                     <th>Total</th>
                                     <th>Estado</th>
                                     <th>Motivo de cancelación</th>
+                                    <th>Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -826,6 +795,7 @@ if ($vista === "notificar") {
                                         $claseHist = strtr($claseHist, ["á"=>"a", "é"=>"e", "í"=>"i", "ó"=>"o", "ú"=>"u", "ñ"=>"n"]);
                                         $claseHist = preg_replace('/[^a-z0-9]+/i', '-', $claseHist);
                                     ?>
+                                    <?php $detallesHist = $pedidoHist["detalle_productos"] ? explode("##", $pedidoHist["detalle_productos"]) : []; ?>
                                     <tr>
                                         <td class="celda-pedido">#PED-<?php echo str_pad((string)$pedidoHist["idPedido"], 5, "0", STR_PAD_LEFT); ?></td>
                                         <td><?php echo htmlspecialchars($pedidoHist["cliente"]); ?></td>
@@ -833,6 +803,37 @@ if ($vista === "notificar") {
                                         <td>$ <?php echo number_format((float)$pedidoHist["precioTotal"], 2, ",", "."); ?></td>
                                         <td><span class="estado estado-<?php echo htmlspecialchars($claseHist); ?>"><?php echo htmlspecialchars($estadoHist); ?></span></td>
                                         <td><?php echo mb_strtolower($estadoHist, "UTF-8") === "cancelado" ? htmlspecialchars($pedidoHist["motivoCancelacion"] ?: "Sin motivo registrado") : "—"; ?></td>
+                                        <td><button type="button" class="btn-detalles-historial" aria-expanded="false">Ver detalles</button></td>
+                                    </tr>
+                                    <tr class="fila-detalles-historial" hidden>
+                                        <td colspan="7">
+                                            <div class="detalle-historial-expandido">
+                                                <p><strong>Número de pedido:</strong> #PED-<?php echo str_pad((string)$pedidoHist["idPedido"], 5, "0", STR_PAD_LEFT); ?></p>
+                                                <p><strong>Cliente:</strong> <?php echo htmlspecialchars($pedidoHist["cliente"]); ?></p>
+                                                <p><strong>Teléfono:</strong> <?php echo htmlspecialchars($pedidoHist["telefono"] ?: "No informado"); ?></p>
+                                                <p><strong>Estado:</strong> <?php echo htmlspecialchars($estadoHist); ?></p>
+                                                <p><strong>Total:</strong> $ <?php echo number_format((float)$pedidoHist["precioTotal"], 2, ",", "."); ?></p>
+                                                <?php if (mb_strtolower($estadoHist, "UTF-8") === "cancelado"): ?><p><strong>Motivo de cancelación:</strong> <?php echo htmlspecialchars($pedidoHist["motivoCancelacion"] ?: "Sin motivo registrado"); ?></p><?php endif; ?>
+                                                <strong>Detalle del pedido:</strong>
+                                                <?php foreach ($detallesHist as $detalleTextoHist): ?>
+                                                    <?php $partesHist = explode("||", $detalleTextoHist, 7); $idDetalleHist = (int)($partesHist[0] ?? 0); $archivoLegacyHist = $partesHist[6] ?? ""; ?>
+                                                    <div class="linea-detalle">
+                                                        <strong><?php echo htmlspecialchars($partesHist[2] ?? "Producto"); ?></strong>
+                                                        <span>Cantidad: <?php echo htmlspecialchars($partesHist[3] ?? "0"); ?></span>
+                                                        <span>Precio acordado del detalle: $ <?php echo number_format((float)($partesHist[4] ?? 0) * (int)($partesHist[3] ?? 0), 2, ",", "."); ?></span>
+                                                        <?php if (!empty($partesHist[5])): ?><span>Descripción: <?php echo nl2br(htmlspecialchars($partesHist[5])); ?></span><?php endif; ?>
+                                                        <?php if ($archivoLegacyHist !== ""): ?><div class="archivos-detalle"><strong>Archivo anterior:</strong> <a href="archivo_legacy.php?idDiseno=<?php echo (int)($partesHist[1] ?? 0); ?>">Descargar archivo</a></div><?php endif; ?>
+                                                        <?php if (!empty($archivosPorDetalle[$idDetalleHist])): ?>
+                                                            <div class="archivos-detalle"><strong>Archivos adjuntos:</strong>
+                                                                <?php foreach ($archivosPorDetalle[$idDetalleHist] as $archivoHist): ?>
+                                                                    <div class="archivo-adjunto"><span><?php echo htmlspecialchars($archivoHist["nombreOriginal"]); ?></span><small><?php echo number_format((int)$archivoHist["tamano"] / 1024, 1, ",", "."); ?> KB</small><a href="archivo_pedido.php?id=<?php echo (int)$archivoHist["idArchivo"]; ?>&ver=1" target="_blank" rel="noopener">Ver</a><a href="archivo_pedido.php?id=<?php echo (int)$archivoHist["idArchivo"]; ?>">Descargar</a></div>
+                                                                <?php endforeach; ?>
+                                                            </div>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        </td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -1008,6 +1009,18 @@ document.querySelectorAll(".form-estado").forEach(function(form) {
         });
     });
 
+    document.querySelectorAll(".btn-detalles-historial").forEach(function(boton) {
+        boton.addEventListener("click", function() {
+            const filaPrincipal = boton.closest("tr");
+            const filaDetalle = filaPrincipal ? filaPrincipal.nextElementSibling : null;
+            if (!filaDetalle || !filaDetalle.classList.contains("fila-detalles-historial")) return;
+            const estaAbierto = !filaDetalle.hidden;
+            filaDetalle.hidden = estaAbierto;
+            boton.textContent = estaAbierto ? "Ver detalles" : "Ocultar detalles";
+            boton.setAttribute("aria-expanded", String(!estaAbierto));
+        });
+    });
+
     function mostrarPaso(numeroPaso) {
         document.querySelectorAll(".paso").forEach(function(paso) {
             const seleccionado = paso.dataset.paso === String(numeroPaso);
@@ -1068,47 +1081,78 @@ document.querySelectorAll(".form-estado").forEach(function(form) {
         });
     }
 
-    const producto = document.getElementById("producto");
-    const cantidad = document.getElementById("cantidad");
-    const precioUnitario = document.getElementById("precio_unitario");
+    const listaDetalles = document.getElementById("listaDetallesPedido");
     const totalVisual = document.getElementById("totalVisual");
+    const totalPedidoVisual = document.getElementById("totalPedidoVisual");
+    const botonAgregarDetalle = document.getElementById("agregarDetalle");
 
-    function actualizarTotal() {
-        const cantidadValor = parseFloat(cantidad.value) || 0;
-        const precioValor = parseFloat(precioUnitario.value) || 0;
-        const total = cantidadValor * precioValor;
-
-        totalVisual.textContent = "$ " + total.toLocaleString("es-AR", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
+    function formatoMoneda(valor) {
+        return "$ " + valor.toLocaleString("es-AR", {minimumFractionDigits:2, maximumFractionDigits:2});
+    }
+    function actualizarTotalPedido() {
+        let total = 0;
+        listaDetalles.querySelectorAll("[data-detalle]").forEach(function(bloque) {
+            total += parseFloat(bloque.querySelector('[name="precio_acordado[]"]').value) || 0;
+        });
+        totalVisual.textContent = formatoMoneda(total);
+        totalPedidoVisual.textContent = formatoMoneda(total);
+    }
+    function actualizarNumeracion() {
+        const bloques = listaDetalles.querySelectorAll("[data-detalle]");
+        bloques.forEach(function(bloque, indice) {
+            bloque.querySelector("h3").textContent = "Producto " + (indice + 1);
+            bloque.querySelector("[data-eliminar-detalle]").disabled = bloques.length === 1;
         });
     }
+    function actualizarNombresArchivos() {
+        if (!listaDetalles) return;
+        listaDetalles.querySelectorAll("[data-detalle]").forEach(function(bloque, indice) {
+            const archivo = bloque.querySelector('input[type="file"]');
+            if (archivo) archivo.name = "archivos[" + indice + "][]";
+        });
+    }
+    actualizarNombresArchivos();
 
-    if (producto && cantidad && precioUnitario && totalVisual) {
-    producto.addEventListener("change", function() {
-        const opcion = producto.options[producto.selectedIndex];
-        const precio = opcion.dataset.precio || "";
-
-        if (precio !== "") {
-            precioUnitario.value = precio;
-        }
-
-        actualizarTotal();
-    });
-
-    cantidad.addEventListener("input", actualizarTotal);
-    precioUnitario.addEventListener("input", actualizarTotal);
-
-    document.getElementById("pedidoForm").addEventListener("submit", function(evento) {
-        const monto = parseFloat(document.getElementById("monto").value) || 0;
-        const total = (parseFloat(cantidad.value) || 0) *
-                      (parseFloat(precioUnitario.value) || 0);
-
-        if (monto > total) {
-            evento.preventDefault();
-            alert("La seña no puede ser mayor que el precio total del pedido.");
-        }
-    });
+    if (listaDetalles && botonAgregarDetalle) {
+        botonAgregarDetalle.addEventListener("click", function() {
+            const original = listaDetalles.querySelector("[data-detalle]");
+            const nuevo = original.cloneNode(true);
+            nuevo.querySelectorAll("input, textarea, select").forEach(function(campo) {
+                if (campo.tagName === "SELECT") campo.selectedIndex = 0;
+                else if (campo.type === "number") campo.value = campo.name === "cantidad[]" ? "1" : "";
+                else campo.value = "";
+            });
+            listaDetalles.appendChild(nuevo);
+            actualizarNombresArchivos();
+            actualizarNumeracion(); actualizarTotalPedido();
+        });
+        listaDetalles.addEventListener("click", function(evento) {
+            const boton = evento.target.closest("[data-eliminar-detalle]");
+            if (boton && listaDetalles.querySelectorAll("[data-detalle]").length > 1) {
+                boton.closest("[data-detalle]").remove();
+                actualizarNumeracion(); actualizarTotalPedido();
+            }
+        });
+        listaDetalles.addEventListener("input", actualizarTotalPedido);
+        listaDetalles.addEventListener("change", actualizarTotalPedido);
+        actualizarNumeracion(); actualizarTotalPedido();
+        document.getElementById("pedidoForm").addEventListener("submit", function(evento) {
+            const monto = parseFloat(document.getElementById("monto").value) || 0;
+            let total = 0;
+            let valido = true;
+            listaDetalles.querySelectorAll("[data-detalle]").forEach(function(bloque) {
+                const producto = bloque.querySelector('[name="producto[]"]');
+                const cantidad = parseInt(bloque.querySelector('[name="cantidad[]"]').value, 10) || 0;
+                const precio = parseFloat(bloque.querySelector('[name="precio_acordado[]"]').value) || 0;
+                if (!producto.value || cantidad <= 0 || precio < 0) valido = false;
+                total += precio;
+            });
+            if (!valido || listaDetalles.querySelectorAll("[data-detalle]").length === 0) {
+                evento.preventDefault(); alert("Completá producto, cantidad y precio acordado en cada detalle.");
+            } else if (monto > total) {
+                evento.preventDefault(); alert("La seña no puede ser mayor que el precio total del pedido.");
+            }
+        });
     }
 </script>
 
