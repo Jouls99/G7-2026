@@ -3,9 +3,9 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 20-11-2026 a las 05:06:45
+-- Tiempo de generación: 19-11-2026 a las 08:04:14
 -- Versión del servidor: 10.4.32-MariaDB
--- Versión de PHP: 8.0.30
+-- Versión de PHP: 8.2.12
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -47,9 +47,7 @@ INSERT INTO `archivopedido` (`idArchivo`, `idDetalle`, `nombreOriginal`, `nombre
 (1, 6, 'tanbionicalogo.jpg', 'b7fa9831982b6d19f0ab9cfbd117d644.jpg', 'uploads/disenos/PED-6/detalle-6/b7fa9831982b6d19f0ab9cfbd117d644.jpg', 'image/jpeg', 21103, 1, '2026-11-19 06:17:59'),
 (2, 7, 'tanbionicalogo.jpg', 'b22189d04947593ed0a390f7aead5c82.jpg', 'uploads/disenos/PED-7/detalle-7/b22189d04947593ed0a390f7aead5c82.jpg', 'image/jpeg', 21103, 1, '2026-11-19 06:20:00'),
 (3, 8, 'taza goku.jpg', 'dc3edf0f773760a0391291c572d785ef.jpg', 'uploads/disenos/PED-8/detalle-8/dc3edf0f773760a0391291c572d785ef.jpg', 'image/jpeg', 64906, 1, '2026-11-19 06:31:55'),
-(4, 9, 'botella vegeta.jpg', '8bc4665d0ce89d72c77c3a84ddd495a3.jpg', 'uploads/disenos/PED-8/detalle-9/8bc4665d0ce89d72c77c3a84ddd495a3.jpg', 'image/jpeg', 171652, 1, '2026-11-19 06:31:55'),
-(5, 10, 'taza goku.jpg', '23e7f9efd01b792f880f04db92044716.jpg', 'uploads/disenos/PED-9/detalle-10/23e7f9efd01b792f880f04db92044716.jpg', 'image/jpeg', 64906, 1, '2026-11-20 00:50:11'),
-(6, 11, 'ironman.jpg', '46389706fcf9e75734d43ae4ab33a835.jpg', 'uploads/disenos/PED-10/detalle-11/46389706fcf9e75734d43ae4ab33a835.jpg', 'image/jpeg', 29241, 1, '2026-11-20 04:00:00');
+(4, 9, 'botella vegeta.jpg', '8bc4665d0ce89d72c77c3a84ddd495a3.jpg', 'uploads/disenos/PED-8/detalle-9/8bc4665d0ce89d72c77c3a84ddd495a3.jpg', 'image/jpeg', 171652, 1, '2026-11-19 06:31:55');
 
 -- --------------------------------------------------------
 
@@ -75,9 +73,7 @@ INSERT INTO `cliente` (`idCliente`, `nombre`, `telefono`) VALUES
 (5, 'Pedidoprueba', '3794805439'),
 (6, 'Prueba imagenes', '3794805439'),
 (7, 'Juan carlos', '3794123456'),
-(8, 'Prueba version 9', '3794123456'),
-(9, 'juan', '3794123456'),
-(10, 'Juan Prueba', '3794932729');
+(8, 'Prueba version 9', '3794123456');
 
 -- --------------------------------------------------------
 
@@ -107,9 +103,7 @@ INSERT INTO `detallepedido` (`idDetalle`, `cantidad`, `precioUnitario`, `idPedid
 (6, 3, 1666.67, 6, 131, 6),
 (7, 3, 1666.67, 7, 131, 7),
 (8, 1, 10000.00, 8, 1, 8),
-(9, 1, 15000.00, 8, 4, 9),
-(10, 1, 15000.00, 9, 147, 10),
-(11, 1, 15000.00, 10, 1, 11);
+(9, 1, 15000.00, 8, 4, 9);
 
 -- --------------------------------------------------------
 
@@ -137,9 +131,7 @@ INSERT INTO `diseño` (`idDiseño`, `nombre`, `descripcion`, `archivo`) VALUES
 (6, 'Diseño personalizado', 'Un pin de una banda de musica', NULL),
 (7, 'Diseño personalizado', 'logo de banda de musica', NULL),
 (8, 'Diseño personalizado', 'Taza de goku', NULL),
-(9, 'Diseño personalizado', 'Botella de Vegeta, personaje de Dragon Ball', NULL),
-(10, 'Diseño personalizado', 'taza de goku pero remera de argentina', NULL),
-(11, 'Diseño personalizado', 'Remera de Iron Man de Marvel', NULL);
+(9, 'Diseño personalizado', 'Botella de Vegeta, personaje de Dragon Ball', NULL);
 
 -- --------------------------------------------------------
 
@@ -216,12 +208,7 @@ INSERT INTO `pago` (`idPago`, `monto`, `fechaHoraPago`, `comprobante`, `idPedido
 (9, 2500.00, '2026-11-19 03:20:00', NULL, 7, 2),
 (10, 2500.00, '2026-11-19 03:21:36', NULL, 7, 1),
 (11, 15000.00, '2026-11-19 03:31:55', NULL, 8, 1),
-(12, 10000.00, '2026-11-19 03:33:47', NULL, 8, 1),
-(13, 10000.00, '2026-11-19 21:50:11', NULL, 9, 2),
-(14, 5000.00, '2026-11-19 21:52:19', NULL, 9, 1),
-(15, 20000.00, '2026-11-19 21:52:51', NULL, 5, 2),
-(16, 10000.00, '2026-11-20 00:59:19', NULL, 10, 1),
-(17, 5000.00, '2026-11-20 01:00:18', NULL, 10, 2);
+(12, 10000.00, '2026-11-19 03:33:47', NULL, 8, 1);
 
 -- --------------------------------------------------------
 
@@ -249,12 +236,10 @@ INSERT INTO `pedido` (`idPedido`, `fechaRegistro`, `fechaEntrega`, `precioTotal`
 (2, '2026-10-05 16:08:39', '2026-10-05', 20000.00, 2, 5, NULL, 1),
 (3, '2026-10-05 16:13:24', '2026-10-19', 6000.00, 3, 6, 'el cliente cancelo', 1),
 (4, '2026-11-17 03:08:20', '2026-12-01', 5000.00, 4, 6, NULL, 1),
-(5, '2026-11-19 02:52:21', '2026-11-21', 25000.00, 5, 5, NULL, 1),
-(6, '2026-11-19 03:17:59', '2026-11-20', 5000.00, 6, 6, 'Error de imagen', 1),
+(5, '2026-11-19 02:52:21', '2026-11-21', 25000.00, 5, 4, NULL, 1),
+(6, '2026-11-19 03:17:59', '2026-11-20', 5000.00, 6, 6, 'error de imagen', 1),
 (7, '2026-11-19 03:20:00', '2026-11-23', 5000.00, 7, 5, NULL, 1),
-(8, '2026-11-19 03:31:55', '2026-11-23', 25000.00, 8, 5, NULL, 1),
-(9, '2026-11-19 21:50:11', '2026-11-23', 15000.00, 9, 5, NULL, 1),
-(10, '2026-11-20 00:59:19', '2026-11-23', 15000.00, 10, 5, NULL, 1);
+(8, '2026-11-19 03:31:55', '2026-11-23', 25000.00, 8, 5, NULL, 1);
 
 -- --------------------------------------------------------
 
@@ -564,25 +549,25 @@ ALTER TABLE `usuario`
 -- AUTO_INCREMENT de la tabla `archivopedido`
 --
 ALTER TABLE `archivopedido`
-  MODIFY `idArchivo` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `idArchivo` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT de la tabla `cliente`
 --
 ALTER TABLE `cliente`
-  MODIFY `idCliente` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  MODIFY `idCliente` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT de la tabla `detallepedido`
 --
 ALTER TABLE `detallepedido`
-  MODIFY `idDetalle` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
+  MODIFY `idDetalle` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT de la tabla `diseño`
 --
 ALTER TABLE `diseño`
-  MODIFY `idDiseño` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
+  MODIFY `idDiseño` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT de la tabla `estadopedido`
@@ -600,13 +585,13 @@ ALTER TABLE `mediopago`
 -- AUTO_INCREMENT de la tabla `pago`
 --
 ALTER TABLE `pago`
-  MODIFY `idPago` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
+  MODIFY `idPago` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT de la tabla `pedido`
 --
 ALTER TABLE `pedido`
-  MODIFY `idPedido` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  MODIFY `idPedido` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT de la tabla `producto`
