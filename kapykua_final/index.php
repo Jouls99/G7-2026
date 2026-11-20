@@ -19,7 +19,7 @@ if (empty($_SESSION["idUsuario"])) {
             header("Location: index.php"); exit;
         } else { $errorLogin = "Correo o contraseña incorrectos, o cuenta inactiva."; }
     }
-    ?><!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Acceso a la Cuenta - Kapykuá</title><link rel="stylesheet" href="style.css"></head><body class="auth-page"><header class="auth-banner">Acceso a la Cuenta</header><form class="auth-card" method="post"><h1>Iniciar Sesión</h1><p class="auth-intro">Ingresá tus datos para continuar</p><?php if($errorLogin): ?><p class="auth-error"><?php echo htmlspecialchars($errorLogin); ?></p><?php endif; ?><input type="hidden" name="accion" value="login"><label>Correo Electrónico de Usuario</label><input type="email" name="email" required autocomplete="username"><label>Contraseña:</label><input type="password" name="clave" required autocomplete="current-password"><div class="auth-links"><a href="recuperar.php">¿Olvidaste tu contraseña?</a></div><button class="auth-submit">Ingresar</button></form></body></html><?php exit;
+    ?><!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Acceso a la Cuenta - Kapykuá</title><link rel="stylesheet" href="css/style.css"></head><body class="auth-page"><header class="auth-banner">Acceso a la Cuenta</header><form class="auth-card" method="post"><h1>Iniciar Sesión</h1><p class="auth-intro">Ingresá tus datos para continuar</p><?php if($errorLogin): ?><p class="auth-error"><?php echo htmlspecialchars($errorLogin); ?></p><?php endif; ?><input type="hidden" name="accion" value="login"><label>Correo Electrónico de Usuario</label><input type="email" name="email" required autocomplete="username"><label>Contraseña:</label><input type="password" name="clave" required autocomplete="current-password"><div class="auth-links"><a href="recuperar.php">¿Olvidaste tu contraseña?</a></div><button class="auth-submit">Ingresar</button></form></body></html><?php exit;
 }
 if ($_SERVER["REQUEST_METHOD"] === "POST" && ($_POST["accion"] ?? "") === "logout") { $_SESSION=[]; session_destroy(); header("Location: index.php"); exit; }
 
@@ -377,6 +377,25 @@ $vista = in_array($vistaSolicitada, ["nuevo", "pedidos", "notificar", "historial
     ? $vistaSolicitada
     : "nuevo";
 
+function formatearFechaTarjeta(?string $fecha): string {
+    if (!$fecha) {
+        return "No indicada";
+    }
+    $ts = strtotime($fecha);
+    if ($ts === false) {
+        return "No indicada";
+    }
+    $meses = [
+        1 => "Enero", 2 => "Febrero", 3 => "Marzo", 4 => "Abril",
+        5 => "Mayo", 6 => "Junio", 7 => "Julio", 8 => "Agosto",
+        9 => "Septiembre", 10 => "Octubre", 11 => "Noviembre", 12 => "Diciembre"
+    ];
+    $dia = (int)date("j", $ts);
+    $mes = $meses[(int)date("n", $ts)] ?? "";
+    $anio = date("Y", $ts);
+    return $dia . " de " . $mes . ", " . $anio;
+}
+
 // Pedidos reales con cliente, estado y productos asociados.
 $pedidos = [];
 $estados = [];
@@ -431,7 +450,11 @@ if (in_array($vista, ["pedidos", "notificar", "historial"], true)) {
         ) . "
         GROUP BY p.idPedido, p.idEstado, p.fechaEntrega, p.precioTotal, p.motivoCancelacion,
                  c.nombre, c.telefono, ep.descripcionEstado
-        ORDER BY p.idPedido DESC
+        ORDER BY " . (
+            $vista === "pedidos"
+                ? "p.fechaEntrega IS NULL ASC, p.fechaEntrega ASC, p.idPedido ASC"
+                : "p.idPedido DESC"
+        ) . "
     ";
     $resultadoPedidos = $conn->query($sqlPedidos);
     if ($resultadoPedidos) {
@@ -511,7 +534,7 @@ if ($vista === "notificar" && count($notificaciones) > 0) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kapykuá - Gestión de Pedidos</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
@@ -558,7 +581,6 @@ if ($vista === "notificar" && count($notificaciones) > 0) {
                 </div>
             </div>
         </header>
-        <script>document.addEventListener('DOMContentLoaded',function(){const b=document.getElementById('configTrigger'),m=document.getElementById('configDropdown');b.addEventListener('click',function(e){e.stopPropagation();const open=m.classList.toggle('visible');b.setAttribute('aria-expanded',open?'true':'false');});document.addEventListener('click',function(e){if(!m.contains(e.target)&&!b.contains(e.target)){m.classList.remove('visible');b.setAttribute('aria-expanded','false');}});});</script>
 
         <main class="contenido">
 
@@ -759,21 +781,37 @@ if ($vista === "notificar" && count($notificaciones) > 0) {
                             <article class="tarjeta-pedido">
                                 <div class="cabecera-tarjeta">
                                     <h2>#PED-<?php echo str_pad((string)$pedido["idPedido"], 5, "0", STR_PAD_LEFT); ?></h2>
-                                    <span class="estado estado-<?php echo htmlspecialchars($estadoClase); ?>">
-                                        <?php echo htmlspecialchars($estadoTexto); ?>
-                                    </span>
                                 </div>
 
-                                <form method="POST" class="form-estado">
+                                <p class="cliente-pedido">Cliente: <?php echo htmlspecialchars($pedido["cliente"]); ?></p>
+                                <p class="fecha-pedido">Fecha: <?php echo htmlspecialchars(formatearFechaTarjeta($pedido["fechaEntrega"])); ?></p>
+
+                                <div class="productos-pedido">
+                                    <span class="etiqueta-productos">Productos:</span>
+                                    <?php if ($productosLista): ?>
+                                        <ul class="lista-productos-tarjeta">
+                                            <?php foreach ($productosLista as $productoTexto): ?>
+                                                <li><?php echo htmlspecialchars($productoTexto); ?></li>
+                                            <?php endforeach; ?>
+                                        </ul>
+                                    <?php else: ?>
+                                        <span>Sin productos asociados</span>
+                                    <?php endif; ?>
+                                </div>
+
+                                <form method="POST" class="form-estado form-estado-tarjeta">
                                     <input type="hidden" name="accion" value="actualizar_estado">
                                     <input type="hidden" name="vista" value="pedidos">
                                     <input type="hidden" name="idPedido" value="<?php echo (int)$pedido["idPedido"]; ?>">
-                                    <label for="estado-<?php echo (int)$pedido["idPedido"]; ?>">Cambiar estado:</label>
                                     <input type="hidden" name="motivoCancelacion" value="">
+                                    <label for="estado-<?php echo (int)$pedido["idPedido"]; ?>" class="etiqueta-estado-tarjeta">ESTADO:</label>
                                     <select
                                         id="estado-<?php echo (int)$pedido["idPedido"]; ?>"
                                         name="idEstado"
-                                        aria-label="Nuevo estado del pedido"
+                                        class="estado selector-estado-tarjeta estado-<?php echo htmlspecialchars($estadoClase); ?>"
+                                        data-valor-inicial="<?php echo (int)$pedido["idEstado"]; ?>"
+                                        aria-label="Estado del pedido"
+                                        onchange="if (this.form.requestSubmit) { this.form.requestSubmit(); } else { this.form.submit(); }"
                                     >
                                         <?php foreach ($estados as $estadoOpcion): ?>
                                             <?php if ((int)$estadoOpcion["idEstado"] === 5) continue; ?>
@@ -785,68 +823,78 @@ if ($vista === "notificar" && count($notificaciones) > 0) {
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
-                                    <button type="submit" class="btn-guardar-estado">Guardar</button>
                                 </form>
 
-                                <p class="cliente-pedido">Cliente: <strong><?php echo htmlspecialchars($pedido["cliente"]); ?></strong></p>
-                                <p><strong>Fecha de entrega:</strong>
-                                    <?php echo $pedido["fechaEntrega"] ? date("d/m/Y", strtotime($pedido["fechaEntrega"])) : "No indicada"; ?>
-                                </p>
-
-                                <div class="productos-pedido">
-                                    <strong>Productos:</strong>
-                                    <?php if ($productosLista): ?>
-                                        <ul>
-                                            <?php foreach ($productosLista as $productoTexto): ?>
-                                                <li><?php echo htmlspecialchars($productoTexto); ?></li>
-                                            <?php endforeach; ?>
-                                        </ul>
-                                    <?php else: ?>
-                                        <span>Sin productos asociados</span>
-                                    <?php endif; ?>
-                                </div>
-
                                 <div class="pie-tarjeta">
-                                    <span class="total-pedido">Total: $ <?php echo number_format((float)$pedido["precioTotal"], 2, ",", "."); ?></span>
                                     <button type="button" class="btn-detalles" aria-expanded="false">Ver Detalles</button>
                                 </div>
 
                                 <div class="detalle-expandido" hidden>
-                                    <p><strong>Número de pedido:</strong> #PED-<?php echo str_pad((string)$pedido["idPedido"], 5, "0", STR_PAD_LEFT); ?></p>
-                                    <p><strong>Cliente:</strong> <?php echo htmlspecialchars($pedido["cliente"]); ?></p>
-                                    <p><strong>Teléfono:</strong> <?php echo htmlspecialchars($pedido["telefono"] ?: "No informado"); ?></p>
-                                    <p><strong>Estado:</strong> <?php echo htmlspecialchars($estadoTexto); ?></p>
-                                    <p><strong>Total:</strong> $ <?php echo number_format((float)$pedido["precioTotal"], 2, ",", "."); ?></p>
-                                    <strong>Detalle:</strong>
-                                    <?php foreach ($detallesLista as $detalleTexto): ?>
-                                        <?php $partes = explode("||", $detalleTexto, 7); $idDetalleVista = (int)($partes[0] ?? 0); $archivoLegacy = $partes[6] ?? ""; ?>
-                                        <div class="linea-detalle">
-                                            <strong><?php echo htmlspecialchars($partes[2] ?? "Producto"); ?></strong>
-                                            <span>Cantidad: <?php echo htmlspecialchars($partes[3] ?? "0"); ?></span>
-                                            <span>Precio acordado del detalle: $ <?php echo number_format((float)($partes[4] ?? 0) * (int)($partes[3] ?? 0), 2, ",", "."); ?></span>
-                                            <?php if (!empty($partes[5])): ?><span>Descripción: <?php echo nl2br(htmlspecialchars($partes[5])); ?></span><?php endif; ?>
-                                            <?php if ($archivoLegacy !== ""): ?>
-                                                <div class="archivos-detalle"><strong>Archivo anterior:</strong> <a href="archivo_legacy.php?idDiseno=<?php echo (int)($partes[1] ?? 0); ?>">Descargar archivo</a></div>
-                                            <?php endif; ?>
-                                            <?php if (!empty($archivosPorDetalle[$idDetalleVista])): ?>
-                                                <div class="archivos-detalle"><strong>Archivos adjuntos:</strong>
-                                                    <?php foreach ($archivosPorDetalle[$idDetalleVista] as $archivoVista): ?>
-                                                        <div class="archivo-adjunto"><span><?php echo htmlspecialchars($archivoVista["nombreOriginal"]); ?></span><small><?php echo number_format((int)$archivoVista["tamano"] / 1024, 1, ",", "."); ?> KB</small><a href="archivo_pedido.php?id=<?php echo (int)$archivoVista["idArchivo"]; ?>&ver=1" target="_blank" rel="noopener">Ver</a><a href="archivo_pedido.php?id=<?php echo (int)$archivoVista["idArchivo"]; ?>">Descargar</a></div>
-                                                    <?php endforeach; ?>
-                                                </div>
-                                            <?php endif; ?>
-                                            <form method="POST" enctype="multipart/form-data" class="form-subir-archivo">
-                                                <input type="hidden" name="accion" value="subir_archivo_pedido">
-                                                <input type="hidden" name="vista" value="pedidos">
-                                                <input type="hidden" name="idPedido" value="<?php echo (int)$pedido["idPedido"]; ?>">
-                                                <input type="hidden" name="idDetalle" value="<?php echo $idDetalleVista; ?>">
-                                                <label>Agregar archivo a este producto</label>
-                                                <input type="file" name="archivo_pedido" accept=".jpg,.jpeg,.png,.webp,.pdf" required>
-                                                <small>JPG, PNG, WEBP o PDF. Máximo 8 MB.</small>
-                                                <button type="submit" class="btn-guardar-pago">Adjuntar archivo</button>
-                                            </form>
+                                    <div class="tarjeta-detalle-flotante" role="dialog" aria-modal="true" aria-label="Detalles del pedido #PED-<?php echo str_pad((string)$pedido["idPedido"], 5, "0", STR_PAD_LEFT); ?>">
+                                        <div class="cabecera-detalle-flotante">
+                                            <h3>Detalle de #PED-<?php echo str_pad((string)$pedido["idPedido"], 5, "0", STR_PAD_LEFT); ?></h3>
+                                            <button type="button" class="btn-cerrar-detalle" aria-label="Cerrar ventana de detalles">&times;</button>
                                         </div>
-                                    <?php endforeach; ?>
+                                        <form method="POST" class="form-estado">
+                                            <input type="hidden" name="accion" value="actualizar_estado">
+                                            <input type="hidden" name="vista" value="pedidos">
+                                            <input type="hidden" name="idPedido" value="<?php echo (int)$pedido["idPedido"]; ?>">
+                                            <label for="estado-detalle-<?php echo (int)$pedido["idPedido"]; ?>">Cambiar estado:</label>
+                                            <input type="hidden" name="motivoCancelacion" value="">
+                                            <select
+                                                id="estado-detalle-<?php echo (int)$pedido["idPedido"]; ?>"
+                                                name="idEstado"
+                                                aria-label="Nuevo estado del pedido"
+                                            >
+                                                <?php foreach ($estados as $estadoOpcion): ?>
+                                                    <?php if ((int)$estadoOpcion["idEstado"] === 5) continue; ?>
+                                                    <option
+                                                        value="<?php echo (int)$estadoOpcion["idEstado"]; ?>"
+                                                        <?php echo (int)$estadoOpcion["idEstado"] === (int)$pedido["idEstado"] ? "selected" : ""; ?>
+                                                    >
+                                                        <?php echo htmlspecialchars($estadoOpcion["descripcionEstado"]); ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                            <button type="submit" class="btn-guardar-estado">Guardar</button>
+                                        </form>
+                                        <p><strong>Número de pedido:</strong> #PED-<?php echo str_pad((string)$pedido["idPedido"], 5, "0", STR_PAD_LEFT); ?></p>
+                                        <p><strong>Cliente:</strong> <?php echo htmlspecialchars($pedido["cliente"]); ?></p>
+                                        <p><strong>Teléfono:</strong> <?php echo htmlspecialchars($pedido["telefono"] ?: "No informado"); ?></p>
+                                        <p><strong>Fecha de entrega:</strong> <?php echo htmlspecialchars(formatearFechaTarjeta($pedido["fechaEntrega"])); ?></p>
+                                        <p><strong>Estado:</strong> <?php echo htmlspecialchars($estadoTexto); ?></p>
+                                        <p><strong>Total:</strong> $ <?php echo number_format((float)$pedido["precioTotal"], 2, ",", "."); ?></p>
+                                        <strong>Detalle:</strong>
+                                        <?php foreach ($detallesLista as $detalleTexto): ?>
+                                            <?php $partes = explode("||", $detalleTexto, 7); $idDetalleVista = (int)($partes[0] ?? 0); $archivoLegacy = $partes[6] ?? ""; ?>
+                                            <div class="linea-detalle">
+                                                <strong><?php echo htmlspecialchars($partes[2] ?? "Producto"); ?></strong>
+                                                <span>Cantidad: <?php echo htmlspecialchars($partes[3] ?? "0"); ?></span>
+                                                <span>Precio acordado del detalle: $ <?php echo number_format((float)($partes[4] ?? 0) * (int)($partes[3] ?? 0), 2, ",", "."); ?></span>
+                                                <?php if (!empty($partes[5])): ?><span>Descripción: <?php echo nl2br(htmlspecialchars($partes[5])); ?></span><?php endif; ?>
+                                                <?php if ($archivoLegacy !== ""): ?>
+                                                    <div class="archivos-detalle"><strong>Archivo anterior:</strong> <a href="archivo_legacy.php?idDiseno=<?php echo (int)($partes[1] ?? 0); ?>">Descargar archivo</a></div>
+                                                <?php endif; ?>
+                                                <?php if (!empty($archivosPorDetalle[$idDetalleVista])): ?>
+                                                    <div class="archivos-detalle"><strong>Archivos adjuntos:</strong>
+                                                        <?php foreach ($archivosPorDetalle[$idDetalleVista] as $archivoVista): ?>
+                                                            <div class="archivo-adjunto"><span><?php echo htmlspecialchars($archivoVista["nombreOriginal"]); ?></span><small><?php echo number_format((int)$archivoVista["tamano"] / 1024, 1, ",", "."); ?> KB</small><a href="archivo_pedido.php?id=<?php echo (int)$archivoVista["idArchivo"]; ?>&ver=1" target="_blank" rel="noopener">Ver</a><a href="archivo_pedido.php?id=<?php echo (int)$archivoVista["idArchivo"]; ?>">Descargar</a></div>
+                                                        <?php endforeach; ?>
+                                                    </div>
+                                                <?php endif; ?>
+                                                <form method="POST" enctype="multipart/form-data" class="form-subir-archivo">
+                                                    <input type="hidden" name="accion" value="subir_archivo_pedido">
+                                                    <input type="hidden" name="vista" value="pedidos">
+                                                    <input type="hidden" name="idPedido" value="<?php echo (int)$pedido["idPedido"]; ?>">
+                                                    <input type="hidden" name="idDetalle" value="<?php echo $idDetalleVista; ?>">
+                                                    <label>Agregar archivo a este producto</label>
+                                                    <input type="file" name="archivo_pedido" accept=".jpg,.jpeg,.png,.webp,.pdf" required>
+                                                    <small>JPG, PNG, WEBP o PDF. Máximo 8 MB.</small>
+                                                    <button type="submit" class="btn-guardar-pago">Adjuntar archivo</button>
+                                                </form>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    </div>
                                 </div>
                             </article>
                         <?php endforeach; ?>
@@ -1111,200 +1159,7 @@ if ($vista === "notificar" && count($notificaciones) > 0) {
     </div>
 </div>
 
-<script>
-document.querySelectorAll(".form-estado").forEach(function(form) {
-    form.addEventListener("submit", function(event) {
-        const estado = form.querySelector('select[name="idEstado"]');
-        const motivo = form.querySelector('input[name="motivoCancelacion"]');
-        if (estado && estado.value === "4" && !window.confirm("¿Confirmás que el pedido está terminado y listo para pasar a Notificar?")) {
-            event.preventDefault();
-            return;
-        }
-        if (estado && estado.value === "6") {
-            if (!window.confirm("¿Confirmás que querés cancelar este pedido?")) { event.preventDefault(); return; }
-            const razon = window.prompt("Indique brevemente el motivo de cancelación:");
-            if (razon === null || razon.trim() === "") { event.preventDefault(); if (razon !== null) alert("Debe ingresar un motivo para cancelar el pedido."); return; }
-            motivo.value = razon.trim();
-        }
-    });
-});
-    document.querySelectorAll(".btn-editar-pago").forEach(function(boton) {
-        boton.addEventListener("click", function() {
-            const formulario = boton.closest("td").querySelector(".form-pago");
-            const estaAbierto = !formulario.hidden;
-            formulario.hidden = estaAbierto;
-            boton.setAttribute("aria-expanded", String(!estaAbierto));
-            boton.textContent = estaAbierto ? "✎" : "×";
-        });
-    });
-
-    document.querySelectorAll(".btn-detalles").forEach(function(boton) {
-        boton.addEventListener("click", function() {
-            const detalle = boton.closest(".tarjeta-pedido").querySelector(".detalle-expandido");
-            const estaAbierto = !detalle.hidden;
-            detalle.hidden = estaAbierto;
-            boton.textContent = estaAbierto ? "Ver Detalles" : "Ocultar Detalles";
-            boton.setAttribute("aria-expanded", String(!estaAbierto));
-        });
-    });
-
-    document.querySelectorAll(".form-reactivar-pedido").forEach(function(formulario) {
-        formulario.addEventListener("submit", function(evento) {
-            if (!window.confirm("¿Querés reactivar este pedido? Volverá a Pendiente y se limpiará el motivo de cancelación.")) {
-                evento.preventDefault();
-            }
-        });
-    });
-
-    document.querySelectorAll(".btn-detalles-notificar").forEach(function(boton) {
-        boton.addEventListener("click", function() {
-            const fila = boton.closest("tr");
-            const detalle = fila ? fila.nextElementSibling : null;
-            if (!detalle || !detalle.classList.contains("fila-archivos-notificar")) return;
-            detalle.hidden = !detalle.hidden;
-            boton.setAttribute("aria-expanded", String(!detalle.hidden));
-            boton.textContent = detalle.hidden ? "Archivos del pedido" : "Ocultar archivos";
-        });
-    });
-
-    document.querySelectorAll(".btn-detalles-historial").forEach(function(boton) {
-        boton.addEventListener("click", function() {
-            const filaPrincipal = boton.closest("tr");
-            const filaDetalle = filaPrincipal ? filaPrincipal.nextElementSibling : null;
-            if (!filaDetalle || !filaDetalle.classList.contains("fila-detalles-historial")) return;
-            const estaAbierto = !filaDetalle.hidden;
-            filaDetalle.hidden = estaAbierto;
-            boton.textContent = estaAbierto ? "Ver detalles" : "Ocultar detalles";
-            boton.setAttribute("aria-expanded", String(!estaAbierto));
-        });
-    });
-
-    function mostrarPaso(numeroPaso) {
-        document.querySelectorAll(".paso").forEach(function(paso) {
-            const seleccionado = paso.dataset.paso === String(numeroPaso);
-
-            paso.classList.toggle("abierto", seleccionado);
-            paso.classList.toggle("cerrado", !seleccionado);
-        });
-
-        const seleccionado = document.querySelector(
-            '.paso[data-paso="' + numeroPaso + '"]'
-        );
-
-        if (seleccionado) {
-            seleccionado.scrollIntoView({
-                behavior: "smooth",
-                block: "start"
-            });
-        }
-    }
-
-    document.querySelectorAll(".btn-siguiente").forEach(function(boton) {
-        boton.addEventListener("click", function() {
-            const actual = boton.closest(".paso");
-            const campos = actual.querySelectorAll("input, select, textarea");
-
-            for (const campo of campos) {
-                if (!campo.checkValidity()) {
-                    campo.reportValidity();
-                    return;
-                }
-            }
-
-            mostrarPaso(boton.dataset.siguiente);
-        });
-    });
-
-    document.querySelectorAll(".btn-atras").forEach(function(boton) {
-        boton.addEventListener("click", function() {
-            mostrarPaso(boton.dataset.anterior);
-        });
-    });
-
-    document.querySelectorAll(".flecha").forEach(function(boton) {
-        boton.addEventListener("click", function() {
-            mostrarPaso(boton.dataset.abrir);
-        });
-    });
-
-    const menuNuevoPedido = document.getElementById("menuNuevoPedido");
-    const formularioPedido = document.getElementById("pedidoForm");
-
-    if (menuNuevoPedido && formularioPedido) {
-        menuNuevoPedido.addEventListener("click", function(evento) {
-            // Si ya estamos en Nuevo Pedido, vuelve al primer paso del formulario.
-            // Desde Pedidos o Notificar, se deja funcionar el enlace normal (?vista=nuevo).
-            evento.preventDefault();
-            mostrarPaso(1);
-        });
-    }
-
-    const listaDetalles = document.getElementById("listaDetallesPedido");
-    const totalVisual = document.getElementById("totalVisual");
-    const totalPedidoVisual = document.getElementById("totalPedidoVisual");
-    const botonAgregarDetalle = document.getElementById("agregarDetalle");
-
-    function formatoMoneda(valor) {
-        return "$ " + valor.toLocaleString("es-AR", {minimumFractionDigits:2, maximumFractionDigits:2});
-    }
-    function actualizarTotalPedido() {
-        let total = 0;
-        listaDetalles.querySelectorAll("[data-detalle]").forEach(function(bloque) {
-            total += parseFloat(bloque.querySelector('[name="precio_acordado[]"]').value) || 0;
-        });
-        totalVisual.textContent = formatoMoneda(total);
-        totalPedidoVisual.textContent = formatoMoneda(total);
-    }
-    function actualizarNumeracion() {
-        const bloques = listaDetalles.querySelectorAll("[data-detalle]");
-        bloques.forEach(function(bloque, indice) {
-            bloque.querySelector("h3").textContent = "Producto " + (indice + 1);
-            bloque.querySelector("[data-eliminar-detalle]").disabled = bloques.length === 1;
-        });
-    }
-
-
-    if (listaDetalles && botonAgregarDetalle) {
-        botonAgregarDetalle.addEventListener("click", function() {
-            const original = listaDetalles.querySelector("[data-detalle]");
-            const nuevo = original.cloneNode(true);
-            nuevo.querySelectorAll("input, textarea, select").forEach(function(campo) {
-                if (campo.tagName === "SELECT") campo.selectedIndex = 0;
-                else if (campo.type === "number") campo.value = campo.name === "cantidad[]" ? "1" : "";
-                else campo.value = "";
-            });
-            listaDetalles.appendChild(nuevo);
-                    actualizarNumeracion(); actualizarTotalPedido();
-        });
-        listaDetalles.addEventListener("click", function(evento) {
-            const boton = evento.target.closest("[data-eliminar-detalle]");
-            if (boton && listaDetalles.querySelectorAll("[data-detalle]").length > 1) {
-                boton.closest("[data-detalle]").remove();
-                actualizarNumeracion(); actualizarTotalPedido();
-            }
-        });
-        listaDetalles.addEventListener("input", actualizarTotalPedido);
-        listaDetalles.addEventListener("change", actualizarTotalPedido);
-        actualizarNumeracion(); actualizarTotalPedido();
-        document.getElementById("pedidoForm").addEventListener("submit", function(evento) {
-            const monto = parseFloat(document.getElementById("monto").value) || 0;
-            let total = 0;
-            let valido = true;
-            listaDetalles.querySelectorAll("[data-detalle]").forEach(function(bloque) {
-                const producto = bloque.querySelector('[name="producto[]"]');
-                const cantidad = parseInt(bloque.querySelector('[name="cantidad[]"]').value, 10) || 0;
-                const precio = parseFloat(bloque.querySelector('[name="precio_acordado[]"]').value) || 0;
-                if (!producto.value || cantidad <= 0 || precio < 0) valido = false;
-                total += precio;
-            });
-            if (!valido || listaDetalles.querySelectorAll("[data-detalle]").length === 0) {
-                evento.preventDefault(); alert("Completá producto, cantidad y precio acordado en cada detalle.");
-            } else if (monto > total) {
-                evento.preventDefault(); alert("La seña no puede ser mayor que el precio total del pedido.");
-            }
-        });
-    }
-</script>
+<script src="js/app.js"></script>
 
 </body>
 </html>
