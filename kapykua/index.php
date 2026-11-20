@@ -36,6 +36,82 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && ($_POST["accion"] ?? "") === "actua
         $stmt->close();
     }
 
+ } elseif ($_SERVER["REQUEST_METHOD"] === "POST" && ($_POST["accion"] ?? "") === "subir_archivo_pedido") {
+    $idPedidoArchivo = (int)($_POST["idPedido"] ?? 0);
+    $idDetalleArchivo = (int)($_POST["idDetalle"] ?? 0);
+    try {
+        if ($idPedidoArchivo <= 0 || $idDetalleArchivo <= 0 || empty($_FILES["archivo_pedido"])) {
+            throw new Exception("Seleccioná un archivo válido para el producto.");
+        }
+        $stmt = $conn->prepare("SELECT ep.descripcionEstado AS estado FROM pedido p INNER JOIN estadopedido ep ON ep.idEstado = p.idEstado INNER JOIN detallepedido dp ON dp.idPedido = p.idPedido WHERE p.idPedido = ? AND dp.idDetalle = ? LIMIT 1");
+        $stmt->bind_param("ii", $idPedidoArchivo, $idDetalleArchivo);
+        $stmt->execute();
+        $pedidoArchivo = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if (!$pedidoArchivo) throw new Exception("El producto no pertenece al pedido indicado.");
+        if (in_array(mb_strtolower($pedidoArchivo["estado"], "UTF-8"), ["entregado", "cancelado"], true)) {
+            throw new Exception("No se pueden modificar los archivos de pedidos entregados o cancelados.");
+        }
+        $archivo = $_FILES["archivo_pedido"];
+        if ($archivo["error"] !== UPLOAD_ERR_OK) throw new Exception("No se pudo recibir el archivo.");
+        $nombreOriginal = basename($archivo["name"]);
+        $tam = (int)$archivo["size"];
+        $ext = strtolower(pathinfo($nombreOriginal, PATHINFO_EXTENSION));
+        $permitidas = ["jpg", "jpeg", "png", "webp", "pdf"];
+        if (!in_array($ext, $permitidas, true) || $tam <= 0 || $tam > 8 * 1024 * 1024) {
+            throw new Exception("El archivo debe ser JPG, PNG, WEBP o PDF y no superar 8 MB.");
+        }
+        $mime = (new finfo(FILEINFO_MIME_TYPE))->file($archivo["tmp_name"]);
+        $mimes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+        if (!in_array($mime, $mimes, true)) throw new Exception("El tipo real del archivo no es válido.");
+        $directorio = __DIR__ . "/uploads/disenos/PED-" . $idPedidoArchivo . "/detalle-" . $idDetalleArchivo;
+        if (!is_dir($directorio) && !mkdir($directorio, 0755, true)) throw new Exception("No se pudo preparar la carpeta de archivos.");
+        $nombreAlmacenado = bin2hex(random_bytes(16)) . "." . $ext;
+        $rutaFisica = $directorio . "/" . $nombreAlmacenado;
+        if (!move_uploaded_file($archivo["tmp_name"], $rutaFisica)) throw new Exception("No se pudo guardar el archivo.");
+        $rutaRelativa = "uploads/disenos/PED-" . $idPedidoArchivo . "/detalle-" . $idDetalleArchivo . "/" . $nombreAlmacenado;
+        $idUsuarioCarga = (int)$_SESSION["idUsuario"];
+        $stmt = $conn->prepare("INSERT INTO archivopedido (idDetalle, nombreOriginal, nombreAlmacenado, ruta, tipoMime, tamano, idUsuario) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("issssii", $idDetalleArchivo, $nombreOriginal, $nombreAlmacenado, $rutaRelativa, $mime, $tam, $idUsuarioCarga);
+        $stmt->execute();
+        $stmt->close();
+        $mensaje = "Archivo agregado al producto correctamente.";
+        $tipoMensaje = "exito";
+    } catch (Exception $e) {
+        $mensaje = $e->getMessage();
+        $tipoMensaje = "error";
+    }
+
+} elseif ($_SERVER["REQUEST_METHOD"] === "POST" && ($_POST["accion"] ?? "") === "reactivar_pedido") {
+    $idPedidoReactivar = (int)($_POST["idPedido"] ?? 0);
+    if ($idPedidoReactivar <= 0 || ($_POST["vista"] ?? "") !== "historial") {
+        $mensaje = "No se pudo reactivar el pedido: datos inválidos.";
+        $tipoMensaje = "error";
+    } else {
+        $conn->begin_transaction();
+        try {
+            $stmt = $conn->prepare("SELECT idEstado FROM estadopedido WHERE LOWER(descripcionEstado) = 'pendiente' LIMIT 1");
+            $stmt->execute();
+            $estadoPendiente = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+            if (!$estadoPendiente) throw new Exception("No existe el estado Pendiente en la base de datos.");
+            $idEstadoPendiente = (int)$estadoPendiente["idEstado"];
+            $stmt = $conn->prepare("UPDATE pedido SET idEstado = ?, motivoCancelacion = NULL WHERE idPedido = ? AND idEstado = (SELECT idEstado FROM estadopedido WHERE LOWER(descripcionEstado) = 'cancelado' LIMIT 1)");
+            $stmt->bind_param("ii", $idEstadoPendiente, $idPedidoReactivar);
+            $stmt->execute();
+            $afectadas = $stmt->affected_rows;
+            $stmt->close();
+            if ($afectadas !== 1) throw new Exception("El pedido no está cancelado o ya fue modificado.");
+            $conn->commit();
+            $mensaje = "Pedido reactivado correctamente. Volvió a Pendiente.";
+            $tipoMensaje = "exito";
+        } catch (Exception $e) {
+            $conn->rollback();
+            $mensaje = $e->getMessage();
+            $tipoMensaje = "error";
+        }
+    }
+
 } elseif ($_SERVER["REQUEST_METHOD"] === "POST" && ($_POST["accion"] ?? "") === "actualizar_pagado") {
     // En Notificar se registra únicamente el importe recibido en este nuevo cobro.
     // Los pagos anteriores (por ejemplo, la seña) se conservan y se suman al mostrar el total abonado.
@@ -190,7 +266,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && ($_POST["accion"] ?? "") === "actua
         $diseno = trim($disenosPedido[$i] ?? "");
         $observaciones = trim($observacionesPedido[$i] ?? "");
         if ($productoId > 0 && $cantidad > 0 && $precioAcordado >= 0) {
-            $detalles[] = ["producto"=>$productoId, "cantidad"=>$cantidad, "precio"=>$precioAcordado, "diseno"=>$diseno, "observaciones"=>$observaciones, "indice"=>$i];
+            $detalles[] = ["producto"=>$productoId, "cantidad"=>$cantidad, "precio"=>$precioAcordado, "diseno"=>$diseno, "observaciones"=>$observaciones];
         }
     }
     $precioTotal = round(array_sum(array_column($detalles, "precio")), 2);
@@ -224,8 +300,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && ($_POST["accion"] ?? "") === "actua
                 if ($detalle["observaciones"] !== "") {
                     $descripcionCompleta .= ($descripcionCompleta !== "" ? "\n\n" : "") . "Observaciones: " . $detalle["observaciones"];
                 }
-                $indice = $detalle["indice"];
-                // La descripción queda asociada al diseño del detalle; los archivos se registran
+                        // La descripción queda asociada al diseño del detalle; los archivos se registran
                 // independientemente en archivopedido para permitir múltiples adjuntos.
                 if ($descripcionCompleta !== "") {
                     $nombreDiseno = "Diseño personalizado";
@@ -245,32 +320,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && ($_POST["accion"] ?? "") === "actua
                 }
                 $stmt->execute(); $idDetalle = $conn->insert_id; $stmt->close();
 
-                // Admite varios archivos por cada detalle. Los nombres físicos son aleatorios.
-                if (isset($_FILES["archivos"]["name"][$indice]) && is_array($_FILES["archivos"]["name"][$indice])) {
-                    $directorio = __DIR__ . "/uploads/disenos/PED-" . $idPedido . "/detalle-" . $idDetalle;
-                    foreach ($_FILES["archivos"]["name"][$indice] as $j => $nombreOriginal) {
-                        $errorArchivo = $_FILES["archivos"]["error"][$indice][$j] ?? UPLOAD_ERR_NO_FILE;
-                        if ($errorArchivo === UPLOAD_ERR_NO_FILE) continue;
-                        if ($errorArchivo !== UPLOAD_ERR_OK) throw new Exception("No se pudo cargar uno de los archivos adjuntos.");
-                        $tmp = $_FILES["archivos"]["tmp_name"][$indice][$j];
-                        $tam = (int)$_FILES["archivos"]["size"][$indice][$j];
-                        $ext = strtolower(pathinfo($nombreOriginal, PATHINFO_EXTENSION));
-                        $permitidas = ["jpg", "jpeg", "png", "webp", "pdf"];
-                        if (!in_array($ext, $permitidas, true) || $tam <= 0 || $tam > 8 * 1024 * 1024) throw new Exception("Cada archivo debe ser JPG, PNG, WEBP o PDF y no superar 8 MB.");
-                        $mime = (new finfo(FILEINFO_MIME_TYPE))->file($tmp);
-                        $mimes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
-                        if (!in_array($mime, $mimes, true)) throw new Exception("El tipo real de uno de los archivos no es válido.");
-                        if (!is_dir($directorio) && !mkdir($directorio, 0755, true)) throw new Exception("No se pudo preparar la carpeta de archivos.");
-                        $nombreAlmacenado = bin2hex(random_bytes(16)) . "." . $ext;
-                        $rutaFisica = $directorio . "/" . $nombreAlmacenado;
-                        if (!move_uploaded_file($tmp, $rutaFisica)) throw new Exception("No se pudo guardar uno de los archivos.");
-                        $rutaRelativa = "uploads/disenos/PED-" . $idPedido . "/detalle-" . $idDetalle . "/" . $nombreAlmacenado;
-                        $idUsuarioCarga = (int)$_SESSION["idUsuario"];
-                        $stmtArchivo = $conn->prepare("INSERT INTO archivopedido (idDetalle, nombreOriginal, nombreAlmacenado, ruta, tipoMime, tamano, idUsuario) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                        $stmtArchivo->bind_param("issssii", $idDetalle, $nombreOriginal, $nombreAlmacenado, $rutaRelativa, $mime, $tam, $idUsuarioCarga);
-                        $stmtArchivo->execute(); $stmtArchivo->close();
-                    }
-                }
+
             }
 
             $stmt = $conn->prepare("INSERT INTO pago (monto, idPedido, idMedioPago) VALUES (?, ?, ?)");
@@ -421,6 +471,32 @@ if ($vista === "notificar") {
         }
     }
 }
+
+// Detalles y archivos de los pedidos terminados: también se pueden adjuntar diseños finales desde Notificar.
+$detallesPorNotificar = [];
+$archivosNotificarPorDetalle = [];
+if ($vista === "notificar" && count($notificaciones) > 0) {
+    $stmtDetalleNotificar = $conn->prepare("SELECT dp.idDetalle, pr.nombre AS producto, dp.cantidad, COALESCE(d.descripcion, '') AS descripcion FROM detallepedido dp INNER JOIN producto pr ON pr.idProducto = dp.idProducto LEFT JOIN diseño d ON d.idDiseño = dp.idDiseño WHERE dp.idPedido = ? ORDER BY dp.idDetalle ASC");
+    $stmtArchivosNotificar = $conn->prepare("SELECT idArchivo, nombreOriginal, tamano FROM archivopedido WHERE idDetalle = ? ORDER BY fechaCarga ASC, idArchivo ASC");
+    foreach ($notificaciones as $avisoDatos) {
+        $idAvisoDatos = (int)$avisoDatos["idPedido"];
+        $stmtDetalleNotificar->bind_param("i", $idAvisoDatos);
+        $stmtDetalleNotificar->execute();
+        $resultadoDetallesNotificar = $stmtDetalleNotificar->get_result();
+        while ($detalleNotificar = $resultadoDetallesNotificar->fetch_assoc()) {
+            $idDetalleNotificar = (int)$detalleNotificar["idDetalle"];
+            $detallesPorNotificar[$idAvisoDatos][] = $detalleNotificar;
+            $stmtArchivosNotificar->bind_param("i", $idDetalleNotificar);
+            $stmtArchivosNotificar->execute();
+            $resultadoArchivosNotificar = $stmtArchivosNotificar->get_result();
+            while ($archivoNotificar = $resultadoArchivosNotificar->fetch_assoc()) {
+                $archivosNotificarPorDetalle[$idDetalleNotificar][] = $archivoNotificar;
+            }
+        }
+    }
+    $stmtDetalleNotificar->close();
+    $stmtArchivosNotificar->close();
+}
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -486,7 +562,7 @@ if ($vista === "notificar") {
             <?php endif; ?>
 
             <?php if ($vista === "nuevo"): ?>
-            <form method="POST" id="pedidoForm" enctype="multipart/form-data">
+            <form method="POST" id="pedidoForm">
 
                 <div class="pasos">
 
@@ -544,7 +620,6 @@ if ($vista === "notificar") {
                                         <div class="campo"><label>Precio acordado por este detalle *</label><input type="number" name="precio_acordado[]" min="0" step="0.01" placeholder="0.00" required></div>
                                     </div>
                                     <div class="campo"><label>Descripción e indicaciones</label><textarea name="diseno[]" rows="3" maxlength="1000" placeholder="Describí el diseño solicitado y cualquier indicación importante para este producto..."></textarea></div>
-                                    <div class="campo"><label>Archivos del diseño (opcional)</label><input type="file" name="archivos[0][]" multiple accept=".jpg,.jpeg,.png,.webp,.pdf"><small>Podés adjuntar varios JPG, PNG, WEBP o PDF. Máximo 8 MB por archivo.</small></div>
                                     <button type="button" class="btn-quitar-detalle" data-eliminar-detalle disabled>Eliminar producto</button>
                                 </div>
                             </div>
@@ -753,6 +828,16 @@ if ($vista === "notificar") {
                                                     <?php endforeach; ?>
                                                 </div>
                                             <?php endif; ?>
+                                            <form method="POST" enctype="multipart/form-data" class="form-subir-archivo">
+                                                <input type="hidden" name="accion" value="subir_archivo_pedido">
+                                                <input type="hidden" name="vista" value="pedidos">
+                                                <input type="hidden" name="idPedido" value="<?php echo (int)$pedido["idPedido"]; ?>">
+                                                <input type="hidden" name="idDetalle" value="<?php echo $idDetalleVista; ?>">
+                                                <label>Agregar archivo a este producto</label>
+                                                <input type="file" name="archivo_pedido" accept=".jpg,.jpeg,.png,.webp,.pdf" required>
+                                                <small>JPG, PNG, WEBP o PDF. Máximo 8 MB.</small>
+                                                <button type="submit" class="btn-guardar-pago">Adjuntar archivo</button>
+                                            </form>
                                         </div>
                                     <?php endforeach; ?>
                                 </div>
@@ -814,6 +899,14 @@ if ($vista === "notificar") {
                                                 <p><strong>Estado:</strong> <?php echo htmlspecialchars($estadoHist); ?></p>
                                                 <p><strong>Total:</strong> $ <?php echo number_format((float)$pedidoHist["precioTotal"], 2, ",", "."); ?></p>
                                                 <?php if (mb_strtolower($estadoHist, "UTF-8") === "cancelado"): ?><p><strong>Motivo de cancelación:</strong> <?php echo htmlspecialchars($pedidoHist["motivoCancelacion"] ?: "Sin motivo registrado"); ?></p><?php endif; ?>
+                                                <?php if (mb_strtolower($estadoHist, "UTF-8") === "cancelado"): ?>
+                                                    <form method="POST" class="form-reactivar-pedido">
+                                                        <input type="hidden" name="accion" value="reactivar_pedido">
+                                                        <input type="hidden" name="vista" value="historial">
+                                                        <input type="hidden" name="idPedido" value="<?php echo (int)$pedidoHist["idPedido"]; ?>">
+                                                        <button type="submit" class="btn-guardar-pago">Reactivar pedido</button>
+                                                    </form>
+                                                <?php endif; ?>
                                                 <strong>Detalle del pedido:</strong>
                                                 <?php foreach ($detallesHist as $detalleTextoHist): ?>
                                                     <?php $partesHist = explode("||", $detalleTextoHist, 7); $idDetalleHist = (int)($partesHist[0] ?? 0); $archivoLegacyHist = $partesHist[6] ?? ""; ?>
@@ -863,6 +956,7 @@ if ($vista === "notificar") {
                                     <th>Total</th>
                                     <th>Pagado</th>
                                     <th>Estado</th>
+                                    <th>Archivos</th>
                                     <th>WhatsApp</th>
                                 </tr>
                             </thead>
@@ -943,7 +1037,7 @@ if ($vista === "notificar") {
                                                     name="accion_visual"
                                                     class="selector-estado estado-terminado"
                                                     aria-label="Confirmar entrega del pedido"
-                                                    onchange="if (this.value === 'entregado') this.form.submit(); else this.value = 'terminado';"
+                                                    onchange="if (this.value === 'entregado') { if (window.confirm('¿Confirmás que el pedido fue entregado al cliente? Pasará al Historial.')) this.form.submit(); else this.value = 'terminado'; } else { this.value = 'terminado'; }"
                                                 >
                                                     <option value="terminado" selected>Terminado</option>
                                                     <option value="entregado" <?php echo $saldoAviso > 0.009 ? "disabled title=\"Completá el pago pendiente antes de entregar\"" : ""; ?>>Entregado</option>
@@ -953,6 +1047,7 @@ if ($vista === "notificar") {
                                                 <?php endif; ?>
                                             </form>
                                         </td>
+                                        <td><button type="button" class="btn-detalles-notificar" aria-expanded="false">Archivos del pedido</button></td>
                                         <td>
                                             <?php if ($telefonoAviso !== "" && strlen($telefonoAviso) >= 11): ?>
                                                 <a class="btn-whatsapp" href="https://wa.me/<?php echo htmlspecialchars($telefonoAviso); ?>?text=<?php echo rawurlencode($mensajeWhatsapp); ?>" target="_blank" rel="noopener noreferrer">
@@ -961,6 +1056,38 @@ if ($vista === "notificar") {
                                             <?php else: ?>
                                                 <span class="sin-telefono" title="Completá el teléfono del cliente con característica y número">Sin teléfono válido</span>
                                             <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                    <tr class="fila-archivos-notificar" hidden>
+                                        <td colspan="7">
+                                            <div class="detalle-historial-expandido">
+                                                <strong>Archivos del pedido</strong>
+                                                <?php foreach (($detallesPorNotificar[(int)$aviso["idPedido"]] ?? []) as $detalleNotificarVista): ?>
+                                                    <?php $idDetalleNotificarVista = (int)$detalleNotificarVista["idDetalle"]; ?>
+                                                    <div class="linea-detalle">
+                                                        <strong><?php echo htmlspecialchars($detalleNotificarVista["producto"]); ?></strong>
+                                                        <span>Cantidad: <?php echo (int)$detalleNotificarVista["cantidad"]; ?></span>
+                                                        <?php if (!empty($detalleNotificarVista["descripcion"])): ?><span>Descripción: <?php echo nl2br(htmlspecialchars($detalleNotificarVista["descripcion"])); ?></span><?php endif; ?>
+                                                        <?php if (!empty($archivosNotificarPorDetalle[$idDetalleNotificarVista])): ?>
+                                                            <div class="archivos-detalle"><strong>Archivos adjuntos:</strong>
+                                                                <?php foreach ($archivosNotificarPorDetalle[$idDetalleNotificarVista] as $archivoNotificarVista): ?>
+                                                                    <div class="archivo-adjunto"><span><?php echo htmlspecialchars($archivoNotificarVista["nombreOriginal"]); ?></span><small><?php echo number_format((int)$archivoNotificarVista["tamano"] / 1024, 1, ",", "."); ?> KB</small><a href="archivo_pedido.php?id=<?php echo (int)$archivoNotificarVista["idArchivo"]; ?>&ver=1" target="_blank" rel="noopener">Ver</a><a href="archivo_pedido.php?id=<?php echo (int)$archivoNotificarVista["idArchivo"]; ?>">Descargar</a></div>
+                                                                <?php endforeach; ?>
+                                                            </div>
+                                                        <?php endif; ?>
+                                                        <form method="POST" enctype="multipart/form-data" class="form-subir-archivo">
+                                                            <input type="hidden" name="accion" value="subir_archivo_pedido">
+                                                            <input type="hidden" name="vista" value="notificar">
+                                                            <input type="hidden" name="idPedido" value="<?php echo (int)$aviso["idPedido"]; ?>">
+                                                            <input type="hidden" name="idDetalle" value="<?php echo $idDetalleNotificarVista; ?>">
+                                                            <label>Agregar archivo a este producto</label>
+                                                            <input type="file" name="archivo_pedido" accept=".jpg,.jpeg,.png,.webp,.pdf" required>
+                                                            <small>JPG, PNG, WEBP o PDF. Máximo 8 MB.</small>
+                                                            <button type="submit" class="btn-guardar-pago">Adjuntar archivo</button>
+                                                        </form>
+                                                    </div>
+                                                <?php endforeach; ?>
+                                            </div>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -982,7 +1109,12 @@ document.querySelectorAll(".form-estado").forEach(function(form) {
     form.addEventListener("submit", function(event) {
         const estado = form.querySelector('select[name="idEstado"]');
         const motivo = form.querySelector('input[name="motivoCancelacion"]');
+        if (estado && estado.value === "4" && !window.confirm("¿Confirmás que el pedido está terminado y listo para pasar a Notificar?")) {
+            event.preventDefault();
+            return;
+        }
         if (estado && estado.value === "6") {
+            if (!window.confirm("¿Confirmás que querés cancelar este pedido?")) { event.preventDefault(); return; }
             const razon = window.prompt("Indique brevemente el motivo de cancelación:");
             if (razon === null || razon.trim() === "") { event.preventDefault(); if (razon !== null) alert("Debe ingresar un motivo para cancelar el pedido."); return; }
             motivo.value = razon.trim();
@@ -1006,6 +1138,25 @@ document.querySelectorAll(".form-estado").forEach(function(form) {
             detalle.hidden = estaAbierto;
             boton.textContent = estaAbierto ? "Ver Detalles" : "Ocultar Detalles";
             boton.setAttribute("aria-expanded", String(!estaAbierto));
+        });
+    });
+
+    document.querySelectorAll(".form-reactivar-pedido").forEach(function(formulario) {
+        formulario.addEventListener("submit", function(evento) {
+            if (!window.confirm("¿Querés reactivar este pedido? Volverá a Pendiente y se limpiará el motivo de cancelación.")) {
+                evento.preventDefault();
+            }
+        });
+    });
+
+    document.querySelectorAll(".btn-detalles-notificar").forEach(function(boton) {
+        boton.addEventListener("click", function() {
+            const fila = boton.closest("tr");
+            const detalle = fila ? fila.nextElementSibling : null;
+            if (!detalle || !detalle.classList.contains("fila-archivos-notificar")) return;
+            detalle.hidden = !detalle.hidden;
+            boton.setAttribute("aria-expanded", String(!detalle.hidden));
+            boton.textContent = detalle.hidden ? "Archivos del pedido" : "Ocultar archivos";
         });
     });
 
@@ -1104,14 +1255,7 @@ document.querySelectorAll(".form-estado").forEach(function(form) {
             bloque.querySelector("[data-eliminar-detalle]").disabled = bloques.length === 1;
         });
     }
-    function actualizarNombresArchivos() {
-        if (!listaDetalles) return;
-        listaDetalles.querySelectorAll("[data-detalle]").forEach(function(bloque, indice) {
-            const archivo = bloque.querySelector('input[type="file"]');
-            if (archivo) archivo.name = "archivos[" + indice + "][]";
-        });
-    }
-    actualizarNombresArchivos();
+
 
     if (listaDetalles && botonAgregarDetalle) {
         botonAgregarDetalle.addEventListener("click", function() {
@@ -1123,8 +1267,7 @@ document.querySelectorAll(".form-estado").forEach(function(form) {
                 else campo.value = "";
             });
             listaDetalles.appendChild(nuevo);
-            actualizarNombresArchivos();
-            actualizarNumeracion(); actualizarTotalPedido();
+                    actualizarNumeracion(); actualizarTotalPedido();
         });
         listaDetalles.addEventListener("click", function(evento) {
             const boton = evento.target.closest("[data-eliminar-detalle]");

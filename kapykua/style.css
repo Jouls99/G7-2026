@@ -839,3 +839,12 @@ textarea {
 .detalle-historial-expandido .linea-detalle { margin:10px 0; padding:12px; background:#fff; border:1px solid #ead3dc; border-left:4px solid #87314f; border-radius:8px; }
 .tabla-historial th:last-child,.tabla-historial td:last-child { white-space:nowrap; }
 @media(max-width:850px){ .tabla-historial { min-width:900px; } }
+
+/* Kapykuá final: carga posterior de archivos por producto */
+.form-subir-archivo { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:10px; padding:10px; background:#fff; border:1px dashed #d7aeba; border-radius:8px; }
+.form-subir-archivo label { flex-basis:100%; color:#87314f; font-weight:700; }
+.form-subir-archivo input[type="file"] { min-width:180px; max-width:100%; }
+.form-subir-archivo small { color:#777; }
+.btn-detalles-notificar { padding:8px 10px; border:0; border-radius:6px; background:#87314f; color:#fff; font-weight:700; cursor:pointer; }
+.fila-archivos-notificar > td { padding:14px !important; background:#fff9fb; }
+.form-reactivar-pedido { margin:14px 0; }
